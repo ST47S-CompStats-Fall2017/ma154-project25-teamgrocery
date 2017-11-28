@@ -1,0 +1,123 @@
+---
+title: "testdata"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+# Load data: only need to run once
+
+#install.packages("data.table")
+#library(data.table)
+#ships <- fread('https://raw.githubusercontent.com/hopperrr/ellis-immigration-by-ship/gh-pages/data/trips.tsv')
+
+# Total number of people from each ship
+
+library('ggplot2')
+#install.packages('ggthemes')
+library('ggthemes')
+library('scales')
+library('dplyr')
+#install.packages("mice")
+library('mice')
+#install.packages("randomForest")
+library('randomForest')
+#install.packages("class")
+library('class')
+library('data.table')
+library('lubridate')
+
+```
+
+```{r}
+
+# This data import takes a while
+train <- fread("train.csv")
+
+```
+
+
+```{r}
+
+# This date import is quick
+holidays <- fread("holidays_events.csv")
+items <- fread("items.csv")
+oil <- fread("oil.csv")
+stores <- fread("stores.csv")
+
+# Make sandbox train and test data
+set.seed(888)
+sandbox <- train[sample(.N, 15000),]
+split_pt <- nrow(sandbox) * 0.7
+s_train <- sandbox[1:split_pt,]
+s_test <- sandbox[split_pt:.N,]
+
+```
+
+```{r}
+
+# Set names
+cols <- names(holidays)[-1] # Except for date
+setnames(holidays, (cols), paste("holiday_", (cols), sep=""))
+
+cols <- names(items)[-1] # Except for item_nbr
+setnames(items, (cols), paste("item_", (cols), sep=""))
+
+setnames(oil, "dcoilwtico", "oil_price")
+
+cols <- names(stores)[-1] # Except for store_nbr
+setnames(stores, (cols), paste("store_", (cols), sep=""))
+
+# Join with holidays_events
+setkey(s_train, date)
+setkey(holidays, date)
+s_train <- merge(s_train, holidays, all.x = TRUE)
+
+# Join with items
+setkey(s_train, item_nbr)
+setkey(items, item_nbr)
+s_train <- merge(s_train, items, all.x = TRUE)
+
+# Join with oil
+setkey(s_train, date)
+setkey(oil, date)
+s_train <- merge(s_train, oil, all.x = TRUE)
+
+# Join with stores
+setkey(s_train, store_nbr)
+setkey(stores, store_nbr)
+s_train <- merge(s_train, stores, all.x = TRUE)
+
+setkey(s_train, id)
+
+# Make a backup
+s_train_bak <- copy(s_train)
+
+```
+
+
+```{r}
+
+# Add cols for "year", "month", "day" (values 1-365)
+s_train[,c("year", "month", "day") := 0]
+
+dates_str <- s_train$date
+dates <- lapply(strsplit(dates_str, "-"), as.integer)
+for (i in 1:length(dates)) {
+  # Calculate vals
+  date = dates[[i]]
+  y = date[1]
+  m = date[2]
+  d = yday(ymd(dates_str[i])) # Day of year
+  
+  # Update table
+  set(s_train, i, "year", y)
+  set(s_train, i, "month", m)
+  set(s_train, i, "day", d)
+}
+
+```
