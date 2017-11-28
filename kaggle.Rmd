@@ -128,7 +128,11 @@ for (i in 1:length(dates)) {
 s_train <- s_train %>% mutate( days_of_week <- weekdays(as.Date(s_train$date,'%Y-%m-%d'))) %>% filter(-day)
 #Let's create some summary statistics
 for (i in 1:ncol(s_train)){
-eval(parse(text = paste(paste("sales_plot_",names(s_train)[i]," = ",sep = ""),"s_train %>% group_by(",names(s_train)[i],") %>% summarize(sales = sum(unit_sales)) %>% ggplot() + geom_col(aes(x =as.factor(",names(s_train)[i],"), y = sales))")))
+eval(parse(text = paste(paste("sales_plot_",names(s_train)[i]," = ",sep = ""),"s_train %>% group_by(",names(s_train)[i],") %>% summarize(sales = mean(unit_sales)) %>% ggplot() + geom_col(aes(x =as.factor(",names(s_train)[i],"), y = sales))")))
+}
+#Let's also just get some simple frequency statistics
+for (i in 1:ncol(s_train)){
+eval(parse(text = paste(paste("sales_plot_",names(s_train)[i]," = ",sep = ""),"s_train %>% group_by(",names(s_train)[i],") %>% summarize(freq = n() %>% ggplot() + geom_col(aes(x =as.factor(",names(s_train)[i],"), y = sales))")))
 }
 #Input sales_plot and then th variable for the plot like the example below
 sales_plot_store_cluster
