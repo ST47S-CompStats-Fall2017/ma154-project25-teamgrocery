@@ -124,10 +124,14 @@ for (i in 1:length(dates)) {
 ```
 
 ```{r}
+#I want to convert the dates to days of the week as a predictive variable
+s_train <- s_train %>% mutate( days_of_week <- weekdays(as.Date(s_train$date,'%Y-%m-%d'))) %>% filter(-day)
 #Let's create some summary statistics
-for (i in 1:(ncol(s_train)-1)){
-eval(parse(text = paste(paste(names(s_train)[i],"_sales_plot = ",sep = ""),"s_train %>% group_by(",names(s_train)[i],") %>% summarize(sales = sum(unit_sales)) %>% ggplot() + geom_col(aes(x =",names(s_train)[i],", y = sales))")))
+for (i in 1:ncol(s_train)){
+eval(parse(text = paste(paste("sales_plot_",names(s_train)[i]," = ",sep = ""),"s_train %>% group_by(",names(s_train)[i],") %>% summarize(sales = sum(unit_sales)) %>% ggplot() + geom_col(aes(x =as.factor(",names(s_train)[i],"), y = sales))")))
 }
-store_cluster_sales_plot
+#Input sales_plot and then th variable for the plot like the example below
+sales_plot_store_cluster
+
 
 ```
