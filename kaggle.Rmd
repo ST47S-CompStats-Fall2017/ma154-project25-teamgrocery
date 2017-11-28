@@ -28,6 +28,7 @@ library('mice')
 library('randomForest')
 #install.packages("class")
 library('class')
+#install.packages("data.table")
 library('data.table')
 library('lubridate')
 
@@ -36,7 +37,7 @@ library('lubridate')
 ```{r}
 
 # This data import takes a while
-train <- fread("train.csv")
+trahoin <- fread("train.csv")
 
 ```
 
@@ -119,5 +120,14 @@ for (i in 1:length(dates)) {
   set(s_train, i, "month", m)
   set(s_train, i, "day", d)
 }
+
+```
+
+```{r}
+#Let's create some summary statistics
+for (i in 1:(ncol(s_train)-1)){
+eval(parse(text = paste(paste(names(s_train)[i],"_sales_plot = ",sep = ""),"s_train %>% group_by(",names(s_train)[i],") %>% summarize(sales = sum(unit_sales)) %>% ggplot() + geom_col(aes(x =",names(s_train)[i],", y = sales))")))
+}
+store_cluster_sales_plot
 
 ```
