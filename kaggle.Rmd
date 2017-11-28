@@ -125,17 +125,38 @@ for (i in 1:length(dates)) {
 
 ```{r}
 #I want to convert the dates to days of the week as a predictive variable
-s_train <- s_train %>% mutate( days_of_week <- weekdays(as.Date(s_train$date,'%Y-%m-%d'))) %>% filter(-day)
+s_train <- s_train %>% mutate( days_of_week = weekdays(as.Date(s_train$date,'%Y-%m-%d')))
 #Let's create some summary statistics
 for (i in 1:ncol(s_train)){
-eval(parse(text = paste(paste("sales_plot_",names(s_train)[i]," = ",sep = ""),"s_train %>% group_by(",names(s_train)[i],") %>% summarize(sales = mean(unit_sales)) %>% ggplot() + geom_col(aes(x =as.factor(",names(s_train)[i],"), y = sales))")))
+eval(parse(text = paste(paste("sales_table_",names(s_train)[i]," = ",sep = ""),
+                        "s_train %>% group_by(",names(s_train)[i],
+                        ") %>% summarize(sales = mean(unit_sales))")))
+}
+#Let's graph them
+for (i in 1:ncol(s_train)){
+eval(parse(text = paste(paste("sales_plot_",names(s_train)[i]," = ",sep = ""),
+                        "s_train %>% group_by(",names(s_train)[i],
+                        ") %>% summarize(sales = mean(unit_sales)) %>% 
+                        ggplot() + geom_col(aes(x =as.factor(",names(s_train)[i],
+                        "), y = sales))")))
 }
 #Let's also just get some simple frequency statistics
 for (i in 1:ncol(s_train)){
-eval(parse(text = paste(paste("sales_plot_",names(s_train)[i]," = ",sep = ""),"s_train %>% group_by(",names(s_train)[i],") %>% summarize(freq = n() %>% ggplot() + geom_col(aes(x =as.factor(",names(s_train)[i],"), y = sales))")))
+eval(parse(text = paste(paste("freq_table_",names(s_train)[i]," = ",sep = ""),
+                        "s_train %>% group_by(",names(s_train)[i],
+                        ") %>% summarize(freq = n()")))
 }
-#Input sales_plot and then th variable for the plot like the example below
-sales_plot_store_cluster
+#Lets graph them
+for (i in 1:ncol(s_train)){
+eval(parse(text = paste(paste("freq_table_",names(s_train)[i]," = ",sep = ""),
+                        "s_train %>% group_by(",names(s_train)[i],
+                        ") %>% summarize(freq = n() %>% ggplot() + 
+                        geom_col(aes(x =as.factor(",names(s_train)[i],
+                        "), y = sales))")))
+}
+#Input sales_plot, sales_table, freq_table or freq_plot and 
+#then the variable for the plot like the example below
+
 
 
 ```
