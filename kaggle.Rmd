@@ -37,7 +37,7 @@ library('lubridate')
 ```{r}
 
 # This data import takes a while
-trahoin <- fread("train.csv")
+train <- fread("train.csv")
 
 ```
 
