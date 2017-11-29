@@ -121,6 +121,90 @@ for (i in 1:length(dates)) {
   set(s_train, i, "day", d)
 }
 
+
+
+```
+
+```{r}
+#I want to convert the dates to days of the week as a predictive variable
+s_train <- s_train %>% mutate( days_of_week = weekdays(as.Date(s_train$date,'%Y-%m-%d')))
+#Let's create some summary statistics
+for (i in 1:ncol(s_train)){
+eval(parse(text = paste(paste("sales_table_",names(s_train)[i]," = ",sep = ""),
+                        "s_train %>% group_by(",names(s_train)[i],
+                        ") %>% summarize(sales = mean(unit_sales))")))
+}
+#Let's graph them
+for (i in 1:ncol(s_train)){
+eval(parse(text = paste(paste("sales_plot_",names(s_train)[i]," = ",sep = ""),
+                        "s_train %>% group_by(",names(s_train)[i],
+                        ") %>% summarize(sales = mean(unit_sales)) %>% 
+                        ggplot() + geom_col(aes(x =as.factor(",names(s_train)[i],
+                        "), y = sales))")))
+}
+#Let's also just get some simple frequency statistics
+for (i in 1:ncol(s_train)){
+eval(parse(text = paste(paste("freq_table_",names(s_train)[i]," = ",sep = ""),
+                        "s_train %>% group_by(",names(s_train)[i],
+                        ") %>% summarize(freq = n())")))
+}
+#Lets graph them
+for (i in 1:ncol(s_train)){
+eval(parse(text = paste(paste("freq_table_",names(s_train)[i]," = ",sep = ""),
+                        "s_train %>% group_by(",names(s_train)[i],
+                        ") %>% summarize(freq = n()) %>% ggplot() + 
+                        geom_col(aes(x =as.factor(",names(s_train)[i],
+                        "), y = sales))")))
+}
+#Input sales_plot, sales_table, freq_table or freq_plot and 
+#then the variable for the plot like the example below
+
+
+```
+
+```{r}
+
+# See what types of items are most popular
+item_families <- sort(table(s_train$item_family)/10703 * 100, decreasing = TRUE)
+item_families
+popular_items <- names(item_families[item_families > 2])
+
+# Item trends
+
+# By month
+grocery_trends <- s_train[item_family %in% (popular_items), j = .(total_sales = sum(unit_sales)), by = .(item_family, month)]
+ggplot(data = grocery_trends) + geom_line(aes(x = month, y = total_sales, color = item_family)) + expand_limits(y = 0)
+
+# By year
+grocery_trends <- s_train[item_family %in% (popular_items), j = .(total_sales = sum(unit_sales)), by = .(item_family, year)]
+ggplot(data = grocery_trends) + geom_line(aes(x = year, y = total_sales, color = item_family)) + expand_limits(y = 0)
+
+# By day of week
+grocery_trends <- s_train[item_family %in% (popular_items), j = .(total_sales = sum(unit_sales)), by = .(item_family, weekday)]
+ggplot(data = grocery_trends) + geom_line(aes(x = weekday, y = total_sales, color = item_family)) + expand_limits(y = 0)
+
+# By is weekend
+grocery_trends <- s_train[item_family %in% (popular_items), j = .(total_sales = sum(unit_sales)), by = .(item_family, weekend)]
+ggplot(data = grocery_trends) + geom_col(aes(x = weekend, y = total_sales, color = item_family), position="dodge", width=0.7) + expand_limits(y = 0)
+
+```
+
+```{r}
+
+# Run some model
+rf_model <- train(unit_sales ~ 
+                    Sunday + Monday + Tuesday + Wednesday + Thursday + Friday + Saturday +
+                    weekend
+                  , data=s_train, method="rf",
+                  trControl = trainControl(method="oob"),  # Use the OOB error rate 
+                  ntree=500, tuneGrid = data.frame(mtry=1:8),
+                  importance = TRUE)  # need this for variable importance below
+
+predictions <- predict(rf_model, newdata = s_test)
+actual <- s_test$unit_sales
+accuracy <- sum((log(predictions + 1) - log(actual + 1)) ** 2) / length(predictions)
+accuracy
+
 ```
 
 ```{r}
