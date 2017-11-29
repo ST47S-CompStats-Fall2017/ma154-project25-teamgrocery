@@ -144,13 +144,13 @@ eval(parse(text = paste(paste("sales_plot_",names(s_train)[i]," = ",sep = ""),
 for (i in 1:ncol(s_train)){
 eval(parse(text = paste(paste("freq_table_",names(s_train)[i]," = ",sep = ""),
                         "s_train %>% group_by(",names(s_train)[i],
-                        ") %>% summarize(freq = n()")))
+                        ") %>% summarize(freq = n())")))
 }
 #Lets graph them
 for (i in 1:ncol(s_train)){
 eval(parse(text = paste(paste("freq_table_",names(s_train)[i]," = ",sep = ""),
                         "s_train %>% group_by(",names(s_train)[i],
-                        ") %>% summarize(freq = n() %>% ggplot() + 
+                        ") %>% summarize(freq = n()) %>% ggplot() + 
                         geom_col(aes(x =as.factor(",names(s_train)[i],
                         "), y = sales))")))
 }
