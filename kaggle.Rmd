@@ -101,7 +101,7 @@ THIS CHUNK: Modifying the data - adding variables
 ```{r}
 
 # Add cols for "year", "month", "day" (values 1-365)
-sandbox[,c("year", "month", "day") := 0]
+sandbox[,c("year", "month", "day", "weekday") := 0]
 
 dates_str <- sandbox$date
 dates <- lapply(strsplit(dates_str, "-"), as.integer)
@@ -111,11 +111,27 @@ for (i in 1:length(dates)) {
   y = date[1]
   m = date[2]
   d = yday(ymd(dates_str[i])) # Day of year
+  w = wday(ymd(dates_str[i])) # Day of week
   
   # Update table
   set(sandbox, i, "year", y)
   set(sandbox, i, "month", m)
   set(sandbox, i, "day", d)
+  set(sandbox, i, "weekday", w)
+}
+
+# Make a categorical variable for each weekday
+weekday_names <- c("Sun", "Mon", "Tues", "Weds", "Thurs", "Fri", "Sat")
+for (i in 1:7) {
+  weekday_name <- weekday_names[i]
+  sandbox[,(weekday_name) := weekday == (i)]
+}
+
+# Make a categorical variable for each item family 
+item_families <- unique(sandbox$item_family)
+for (i in 1:length(item_families)) {
+  cur_item_family <- item_families[i]
+  sandbox[,(cur_item_family) := item_family == (cur_item_family)]
 }
 
 #I want to convert the dates to days of the week as a predictive variable
@@ -133,7 +149,6 @@ split_pt <- nrow(sandbox) * 0.7
 s_train <- sandbox[1:split_pt,]
 s_test <- sandbox[split_pt:nrow(sandbox),]
 
-View(s_train)
 ```
 
 THIS CHUNK: Summary statistics and data visualization (graphs)
@@ -175,21 +190,22 @@ item_families
 popular_items <- names(item_families[item_families > 2])
 
 # Item trends
+setDT(s_train)
 
 # By month
-grocery_trends <- s_train[item_family %in% (popular_items), j = .(total_sales = sum(unit_sales)), by = (item_family, month)]
+grocery_trends <- s_train[item_family %in% (popular_items), j = .(total_sales = sum(unit_sales)), by = .(item_family, month)]
 ggplot(data = grocery_trends) + geom_line(aes(x = month, y = total_sales, color = item_family)) + expand_limits(y = 0)
 
 # By year
-grocery_trends <- s_train[item_family %in% (popular_items), j = .(total_sales = sum(unit_sales)), by = (item_family, year)]
+grocery_trends <- s_train[item_family %in% (popular_items), j = .(total_sales = sum(unit_sales)), by = .(item_family, year)]
 ggplot(data = grocery_trends) + geom_line(aes(x = year, y = total_sales, color = item_family)) + expand_limits(y = 0)
 
 # By day of week
-grocery_trends <- s_train[item_family %in% (popular_items), j = .(total_sales = sum(unit_sales)), by = (item_family, weekday)]
+grocery_trends <- s_train[item_family %in% (popular_items), j = .(total_sales = sum(unit_sales)), by = .(item_family, weekday)]
 ggplot(data = grocery_trends) + geom_line(aes(x = weekday, y = total_sales, color = item_family)) + expand_limits(y = 0)
 
 # By is weekend
-grocery_trends <- s_train[item_family %in% (popular_items), j = .(total_sales = sum(unit_sales)), by = (item_family, weekend)]
+grocery_trends <- s_train[item_family %in% (popular_items), j = .(total_sales = sum(unit_sales)), by = .(item_family, weekend)]
 ggplot(data = grocery_trends) + geom_col(aes(x = weekend, y = total_sales, color = item_family), position="dodge", width=0.7) + expand_limits(y = 0)
 
 ```
