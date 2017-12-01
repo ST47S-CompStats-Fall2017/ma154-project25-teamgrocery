@@ -38,7 +38,7 @@ library('caret')
 ```{r}
 
 # This data import takes a while
-#train <- fread("train.csv")
+train <- fread("train.csv")
 
 ```
 
@@ -117,6 +117,11 @@ for (i in 1:length(dates)) {
   set(sandbox, i, "year", y)
   set(sandbox, i, "month", m)
   set(sandbox, i, "day", d)
+  if (d < 15) {
+    set(sandbox, i, "days_since_payday", d)  
+  } else {
+    set(sandbox, i, "days_since_payday", d - 15)
+  }
   set(sandbox, i, "weekday", w)
 }
 
@@ -134,11 +139,26 @@ for (i in 1:length(item_families)) {
   sandbox[,(cur_item_family) := item_family == (cur_item_family)]
 }
 
+<<<<<<< HEAD
 # Make a cat. var. for each store city
 store_cities <- unique(sandbox$store_city)
 for (i in 1:length(store_cities)) {
   cur_store_city <- store_cities[i]
   sandbox[,(cur_store_city) := store_city == (cur_store_city)]
+=======
+# Make a binary variable for each store cluster
+store_clusters <- unique(sandbox$store_cluster)
+for (i in 1:length(store_clusters)) {
+  cur_store_cluster <- store_clusters[i]
+  sandbox[,(paste("Cluster", cur_store_cluster)) := store_cluster == (cur_store_cluster)]
+}
+
+# Make a binary variable for each store type
+store_types <- unique(sandbox$store_type)
+for (i in 1:length(store_types)) {
+  cur_store_type <- store_types[i]
+  sandbox[,(paste("Store Type", cur_store_type)) := store_type == (cur_store_type)]
+>>>>>>> c54469781eb4c239c949db5259bfd0f59c6016c8
 }
 
 #I want to convert the dates to days of the week as a predictive variable
@@ -153,10 +173,18 @@ sandbox <- sandbox %>% mutate(holiday = !is.na(holiday_type) &
                                         holiday_locale_name == store_state))
 
 #Work day variable
-sandbox <- sandbox %>% mutate(work_day = holiday_type == "Work Day")
+sandbox <- sandbox %>% mutate(work_day = holiday_type == "Work Day" & !is.na(holiday_type))
 
 #Bring over holiday type where it is relevant to the sale
 sandbox <- sandbox %>% mutate(holiday_type_relevant = ifelse(holiday, holiday_type, "None") )
+
+setDT(sandbox)
+holiday_type_relevant_vals <- unique(sandbox$holiday_type_relevant)
+for (i in 1:length(holiday_type_relevant_vals)) {
+  cur_holiday_type_relevant <- holiday_type_relevant_vals[i]
+  sandbox[,(cur_holiday_type_relevant) := 
+            holiday_type_relevant == (cur_holiday_type_relevant)]
+}
 
 
 split_pt <- nrow(sandbox) * 0.7
@@ -230,9 +258,15 @@ THIS CHUNK: Build and test the model
 ```{r}
 
 # Run some model
+<<<<<<< HEAD
 model_cols <- c("unit_sales", "holiday", weekday_names, item_families, store_cities)
 s_train_model <- s_train[,model_cols, with=FALSE]
 rf_model <- train(unit_sales ~ . , data=s_train_model, method="rf",
+=======
+rf_model <- train(unit_sales ~
+                    
+                  , data=s_train, method="rf",
+>>>>>>> c54469781eb4c239c949db5259bfd0f59c6016c8
                   trControl = trainControl(method="oob"),  # Use the OOB error rate 
                   ntree=500, tuneGrid = data.frame(mtry=((length(model_cols) - 1))/3),
                   importance = TRUE)  # need this for variable importance below
@@ -241,5 +275,5 @@ predictions <- predict(rf_model, newdata = s_test)
 actual <- s_test$unit_sales
 accuracy <- sum((log(predictions + 1) - log(actual + 1)) ** 2) / length(predictions)
 accuracy
-
+View(s_train)
 ```
