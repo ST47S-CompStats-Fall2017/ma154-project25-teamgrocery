@@ -139,6 +139,10 @@ for (i in 1:length(item_families)) {
   sandbox[,(cur_item_family) := item_family == (cur_item_family)]
 }
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 08fc9a3a65b739fa6082a669fa4d07ef6cd81879
 # Make a cat. var. for each store city
 store_cities <- unique(sandbox$store_city)
 for (i in 1:length(store_cities)) {
@@ -174,7 +178,7 @@ sandbox <- sandbox %>% mutate(holiday = !is.na(holiday_type) &
 sandbox <- sandbox %>% mutate(work_day = holiday_type == "Work Day" & !is.na(holiday_type))
 
 #Bring over holiday type where it is relevant to the sale
-sandbox <- sandbox %>% mutate(holiday_type_relevant = ifelse(holiday, holiday_type, "None") )
+sandbox <- sandbox %>% mutate(holiday_type_relevant = ifelse(holiday, paste("holiday_",holiday_type,sep = ""), "holiday_None") )
 
 setDT(sandbox)
 holiday_type_relevant_vals <- unique(sandbox$holiday_type_relevant)
@@ -256,7 +260,12 @@ THIS CHUNK: Build and test the model
 ```{r}
 
 # Run some model
+<<<<<<< HEAD
 model_cols <- c("unit_sales", item_families, "holiday", "work_day", paste("Cluster",store_clusters), store_cities, paste("Store Type", store_types), weekday_names)
+=======
+
+model_cols <- c("unit_sales", "holiday", weekday_names, item_families, store_cities)
+>>>>>>> 08fc9a3a65b739fa6082a669fa4d07ef6cd81879
 s_train_model <- s_train[,model_cols, with=FALSE]
 rf_model <- train(unit_sales ~ . , data=s_train_model, method="rf",
                   trControl = trainControl(method="oob"),  # Use the OOB error rate 
