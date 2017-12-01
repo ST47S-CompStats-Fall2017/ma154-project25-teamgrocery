@@ -38,7 +38,7 @@ library('caret')
 ```{r}
 
 # This data import takes a while
-#train <- fread("train.csv")
+train <- fread("train.csv")
 
 ```
 
@@ -117,6 +117,11 @@ for (i in 1:length(dates)) {
   set(sandbox, i, "year", y)
   set(sandbox, i, "month", m)
   set(sandbox, i, "day", d)
+  if (d < 15) {
+    set(sandbox, i, "days_since_payday", d)  
+  } else {
+    set(sandbox, i, "days_since_payday", d - 15)
+  }
   set(sandbox, i, "weekday", w)
 }
 
@@ -132,6 +137,20 @@ item_families <- unique(sandbox$item_family)
 for (i in 1:length(item_families)) {
   cur_item_family <- item_families[i]
   sandbox[,(cur_item_family) := item_family == (cur_item_family)]
+}
+
+# Make a binary variable for each store cluster
+store_clusters <- unique(sandbox$store_cluster)
+for (i in 1:length(store_clusters)) {
+  cur_store_cluster <- store_clusters[i]
+  sandbox[,(paste("Cluster", cur_store_cluster)) := store_cluster == (cur_store_cluster)]
+}
+
+# Make a binary variable for each store type
+store_types <- unique(sandbox$store_type)
+for (i in 1:length(store_types)) {
+  cur_store_type <- store_types[i]
+  sandbox[,(paste("Store Type", cur_store_type)) := store_type == (cur_store_type)]
 }
 
 #I want to convert the dates to days of the week as a predictive variable
