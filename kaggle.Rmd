@@ -139,13 +139,13 @@ for (i in 1:length(item_families)) {
   sandbox[,(cur_item_family) := item_family == (cur_item_family)]
 }
 
-<<<<<<< HEAD
+
 # Make a cat. var. for each store city
 store_cities <- unique(sandbox$store_city)
 for (i in 1:length(store_cities)) {
   cur_store_city <- store_cities[i]
   sandbox[,(cur_store_city) := store_city == (cur_store_city)]
-=======
+}
 # Make a binary variable for each store cluster
 store_clusters <- unique(sandbox$store_cluster)
 for (i in 1:length(store_clusters)) {
@@ -158,7 +158,6 @@ store_types <- unique(sandbox$store_type)
 for (i in 1:length(store_types)) {
   cur_store_type <- store_types[i]
   sandbox[,(paste("Store Type", cur_store_type)) := store_type == (cur_store_type)]
->>>>>>> c54469781eb4c239c949db5259bfd0f59c6016c8
 }
 
 #I want to convert the dates to days of the week as a predictive variable
@@ -176,7 +175,7 @@ sandbox <- sandbox %>% mutate(holiday = !is.na(holiday_type) &
 sandbox <- sandbox %>% mutate(work_day = holiday_type == "Work Day" & !is.na(holiday_type))
 
 #Bring over holiday type where it is relevant to the sale
-sandbox <- sandbox %>% mutate(holiday_type_relevant = ifelse(holiday, holiday_type, "None") )
+sandbox <- sandbox %>% mutate(holiday_type_relevant = ifelse(holiday, paste("holiday_",holiday_type,sep = ""), "holiday_None") )
 
 setDT(sandbox)
 holiday_type_relevant_vals <- unique(sandbox$holiday_type_relevant)
@@ -258,15 +257,10 @@ THIS CHUNK: Build and test the model
 ```{r}
 
 # Run some model
-<<<<<<< HEAD
+
 model_cols <- c("unit_sales", "holiday", weekday_names, item_families, store_cities)
 s_train_model <- s_train[,model_cols, with=FALSE]
 rf_model <- train(unit_sales ~ . , data=s_train_model, method="rf",
-=======
-rf_model <- train(unit_sales ~
-                    
-                  , data=s_train, method="rf",
->>>>>>> c54469781eb4c239c949db5259bfd0f59c6016c8
                   trControl = trainControl(method="oob"),  # Use the OOB error rate 
                   ntree=500, tuneGrid = data.frame(mtry=((length(model_cols) - 1))/3),
                   importance = TRUE)  # need this for variable importance below
