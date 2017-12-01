@@ -140,9 +140,16 @@ sandbox <- sandbox %>% mutate( days_of_week = weekdays(as.Date(sandbox$date,'%Y-
 #General idea of when holidays happen in a specific location
 sandbox <- sandbox %>% mutate(holiday = !is.na(holiday_type) &
                                         !holiday_transferred &
+                                         holiday_type != "Work Day" &
                                         (holiday_locale == "National"|
                                         holiday_locale_name == store_city |
                                         holiday_locale_name == store_state))
+
+#Work day variable
+sandbox <- sandbox %>% mutate(work_day = holiday_type == "Work Day")
+
+#Bring over holiday type where it is relevant to the sale
+sandbox <- sandbox %>% mutate(holiday_type_relevant = ifelse(holiday, holiday_type, "None") )
 
 
 split_pt <- nrow(sandbox) * 0.7
