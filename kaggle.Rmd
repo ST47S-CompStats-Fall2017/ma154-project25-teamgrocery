@@ -151,6 +151,14 @@ sandbox <- sandbox %>% mutate(work_day = holiday_type == "Work Day" & !is.na(hol
 #Bring over holiday type where it is relevant to the sale
 sandbox <- sandbox %>% mutate(holiday_type_relevant = ifelse(holiday, holiday_type, "None") )
 
+setDT(sandbox)
+holiday_type_relevant_vals <- unique(sandbox$holiday_type_relevant)
+for (i in 1:length(holiday_type_relevant_vals)) {
+  cur_holiday_type_relevant <- holiday_type_relevant_vals[i]
+  sandbox[,(cur_holiday_type_relevant) := 
+            holiday_type_relevant == (cur_holiday_type_relevant)]
+}
+
 
 split_pt <- nrow(sandbox) * 0.7
 s_train <- sandbox[1:split_pt,]
