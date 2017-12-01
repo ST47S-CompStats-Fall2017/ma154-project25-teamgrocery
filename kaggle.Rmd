@@ -134,6 +134,13 @@ for (i in 1:length(item_families)) {
   sandbox[,(cur_item_family) := item_family == (cur_item_family)]
 }
 
+# Make a cat. var. for each store city
+store_cities <- unique(sandbox$store_city)
+for (i in 1:length(store_cities)) {
+  cur_store_city <- store_cities[i]
+  sandbox[,(cur_store_city) := store_city == (cur_store_city)]
+}
+
 #I want to convert the dates to days of the week as a predictive variable
 sandbox <- sandbox %>% mutate( days_of_week = weekdays(as.Date(sandbox$date,'%Y-%m-%d')))
 
@@ -155,6 +162,8 @@ sandbox <- sandbox %>% mutate(holiday_type_relevant = ifelse(holiday, holiday_ty
 split_pt <- nrow(sandbox) * 0.7
 s_train <- sandbox[1:split_pt,]
 s_test <- sandbox[split_pt:nrow(sandbox),]
+setDT(s_train)
+setDT(s_test)
 
 ```
 
@@ -221,11 +230,11 @@ THIS CHUNK: Build and test the model
 ```{r}
 
 # Run some model
-rf_model <- train(unit_sales ~ 
-                    holiday + days_of_week 
-                  , data=s_train, method="rf",
+model_cols <- c("unit_sales", "holiday", weekday_names, item_families, store_cities)
+s_train_model <- s_train[,model_cols, with=FALSE]
+rf_model <- train(unit_sales ~ . , data=s_train_model, method="rf",
                   trControl = trainControl(method="oob"),  # Use the OOB error rate 
-                  ntree=500, tuneGrid = data.frame(mtry=2),
+                  ntree=500, tuneGrid = data.frame(mtry=((length(model_cols) - 1))/3),
                   importance = TRUE)  # need this for variable importance below
 
 predictions <- predict(rf_model, newdata = s_test)
