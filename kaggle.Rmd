@@ -146,7 +146,7 @@ sandbox <- sandbox %>% mutate(holiday = !is.na(holiday_type) &
                                         holiday_locale_name == store_state))
 
 #Work day variable
-sandbox <- sandbox %>% mutate(work_day = holiday_type == "Work Day")
+sandbox <- sandbox %>% mutate(work_day = holiday_type == "Work Day" & !is.na(holiday_type))
 
 #Bring over holiday type where it is relevant to the sale
 sandbox <- sandbox %>% mutate(holiday_type_relevant = ifelse(holiday, holiday_type, "None") )
@@ -221,8 +221,8 @@ THIS CHUNK: Build and test the model
 ```{r}
 
 # Run some model
-rf_model <- train(unit_sales ~ 
-                    holiday + days_of_week 
+rf_model <- train(unit_sales ~
+                    
                   , data=s_train, method="rf",
                   trControl = trainControl(method="oob"),  # Use the OOB error rate 
                   ntree=500, tuneGrid = data.frame(mtry=2),
@@ -232,5 +232,5 @@ predictions <- predict(rf_model, newdata = s_test)
 actual <- s_test$unit_sales
 accuracy <- sum((log(predictions + 1) - log(actual + 1)) ** 2) / length(predictions)
 accuracy
-
+View(s_train)
 ```
