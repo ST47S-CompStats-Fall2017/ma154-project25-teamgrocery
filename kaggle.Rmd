@@ -139,10 +139,6 @@ for (i in 1:length(item_families)) {
   sandbox[,(cur_item_family) := item_family == (cur_item_family)]
 }
 
-<<<<<<< HEAD
-=======
-
->>>>>>> 08fc9a3a65b739fa6082a669fa4d07ef6cd81879
 # Make a cat. var. for each store city
 store_cities <- unique(sandbox$store_city)
 for (i in 1:length(store_cities)) {
@@ -188,6 +184,9 @@ for (i in 1:length(holiday_type_relevant_vals)) {
             holiday_type_relevant == (cur_holiday_type_relevant)]
 }
 
+# Adding months and days since Jan. 1 2013 (both starting at 1)
+sandbox[,month_count := 12 * (year - 2013) + month]
+sandbox[,day_count := 365 * (year - 2013) + day]
 
 split_pt <- nrow(sandbox) * 0.7
 s_train <- sandbox[1:split_pt,]
@@ -256,16 +255,91 @@ ggplot(data = grocery_trends) + geom_col(aes(x = weekend, y = total_sales, color
 
 ```
 
+THIS CHUNK: Setting up day variable for time series
+1. Make table with 2 cols: day, total_sales (on that day)
+2. Divide total sales by the number of stores included in the dataset on that day (number of stores in dataset increase over time, so we want to factor that out)
+3. Linearize/difference???
+```{r}
+
+### STEP 1: Make table with 2 cols - day_count and sales
+sales_per_day <- s_train[,j = .(sales = sum(unit_sales)), by = day_count]
+
+
+### STEP 2: Divide by total stores open
+
+# The largest day in the dataset
+max_day <- max(s_train$day_count)
+
+# See first and last sale of each store
+store_data <- s_train[,j = .(first = min(day_count), last = max(day_count)), by=store_nbr]
+store_data
+# Shows that although some stores were added over time, no stores ever closed (they all have sales up through Aug. 2016)
+
+
+### COUNT THE NUMBER OF STORES THAT ARE OPEN ON EACH DAY
+
+# Array containing number of stores open, where day is the index ranging from 1 to max_day
+stores_open <- c()
+store_openings <- store_data$first
+store_openings <- ifelse(store_openings < 50, 1, store_openings)
+cur_stores_open <- 0
+
+# Add to the array for each day
+cur_day = 1
+while (length(store_openings) > 0) {
+  to_remove <- c()
+  
+  # Handle all stores that opened on this data
+  for (i in 1:length(store_openings)) {
+    if (store_openings[i] <= cur_day) {
+      to_remove <- c(to_remove, i)
+      cur_stores_open <- cur_stores_open + 1
+    }
+  }
+  
+  # Remove elements
+  if (length(to_remove) > 0) {
+      store_openings <- store_openings[-to_remove]
+  }
+  
+  # Add to the array of stores open on each day
+  stores_open <- c(stores_open, cur_stores_open)
+  cur_day <- cur_day + 1
+}
+
+# Fill out array
+while (cur_day <= max_day) {
+  stores_open <- c(stores_open, cur_stores_open)
+  cur_day <- cur_day + 1
+}
+
+### DONE COUNTING STORES OPEN ON EACH DAY
+
+# Divide sales for each day by number of stores that were open
+for (i in 1:nrow(sales_per_day)) {
+  # Get stores open 
+  cur_day_count = sales_per_day[i,day_count]
+  cur_stores_open = stores_open[cur_day_count]
+  
+  # Modify sales
+  cur_sales = sales_per_day[i, sales]
+  cur_sales <- cur_sales / cur_stores_open 
+  set(sales_per_day, i, "sales", cur_sales)
+}
+ggplot(data = sales_per_day) + geom_line(aes(x = day_count, y = sales)) + expand_limits(y = 0)
+
+
+# Step 3: linearize/difference???
+
+```
+
+
+
 THIS CHUNK: Build and test the model
 ```{r}
 
 # Run some model
-<<<<<<< HEAD
 model_cols <- c("unit_sales", item_families, "holiday", "work_day", paste("Cluster",store_clusters), store_cities, paste("Store Type", store_types), weekday_names)
-=======
-
-model_cols <- c("unit_sales", "holiday", weekday_names, item_families, store_cities)
->>>>>>> 08fc9a3a65b739fa6082a669fa4d07ef6cd81879
 s_train_model <- s_train[,model_cols, with=FALSE]
 rf_model <- train(unit_sales ~ . , data=s_train_model, method="rf",
                   trControl = trainControl(method="oob"),  # Use the OOB error rate 
