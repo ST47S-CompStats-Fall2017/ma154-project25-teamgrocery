@@ -215,6 +215,36 @@ sandbox[,day_count := 365 * (year - 2013) + day]
 
 # 4. Split into transacted/non-transacted (Todo Thomas)
 
+```{r}
+sandbox = fread("sandbox.csv")
+item_ids = unique(sandbox$id)
+store_ids = unique(stores$store_nbr)
+item_store_sales = data.table(matrix(0, nrow=length(item_ids), ncol=length(store_ids)))
+for (i in 1:length(item_ids)) {
+  for (j in 1:length(store_ids)) {
+    cur_item_id = item_ids[i]
+    cur_store_nbr = store_ids[j]
+    item_store_sales[i,j] = nrow(sandbox[sandbox$id==cur_item_id && sandbox$store_nbr==cur_store_nbr])
+  }
+}
+
+# Need actual matrix of days open for every store
+days_open = matrix(1322, nrow=1, ncol=length(store_ids))
+
+View(item_store_sales)
+id_frequency = data.table(item_ids, rep(0,length(train_ids)))
+for (i in 1:length(item_ids)) {
+  total_transaction_days = sum(item_store_sales[i,])
+  days_open_of_stores_w_item = 0
+  for (j in 1:length(store_ids)) {
+    if (item_store_sales[i,j] > 0) {
+      days_open_of_stores_w_item = days_open[1,store_ids[j]] + days_open_of_stores_w_item
+    }
+  }
+  id_frequency[id_frequency$item_ids==item_ids[i]] = total_transaction_days / days_open_of_stores_w_item
+}
+```
+
 # 5. Transacted: time series (Justin)
 
 # 6. Transacted: random forest
