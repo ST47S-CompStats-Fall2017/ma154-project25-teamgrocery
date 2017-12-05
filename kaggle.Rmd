@@ -42,6 +42,7 @@ library('caret')
 
 ```
 
+
 THIS CHUNK: Importing CSV files
 ```{r}
 
@@ -53,9 +54,70 @@ stores <- fread("stores.csv")
 
 # Make sandbox train and test data
 set.seed(888)
-sandbox <- train[sample(.N, 15000),]
+sandbox <- train[sample(.N, 1500),]
 
 
+```
+
+Writes a file of the last two weeks of train.csv
+```{r}
+fwrite(sandbox, "sandbox.csv")
+```
+
+Creates a table of high frequency purchase item IDs
+```{r}
+sandbox = fread("sandbox.csv")
+item_ids = unique(train_last2weeks$id)
+store_ids = unique(stores$store_nbr)
+item_store_sales = data.table(matrix(0, nrow=length(item_ids), ncol=length(store_ids)))
+#colnames(item_store_sales) = item_ids
+#rownames(item_store_sales) = store_ids
+for (i in 1:length(item_ids)) {
+  for (j in 1:length(store_ids)) {
+    cur_item_id = item_ids[i]
+    cur_store_nbr = store_ids[j]
+    #num_transactions = filter(sandbox, id==cur_item_id && store_nbr==cur_store_nbr)
+    item_store_sales[i,j] = nrow(sandbox[sandbox$id==cur_item_id && sandbox$store_nbr==cur_store_nbr])
+  }
+}
+
+# Need actual matrix of days open for every store
+days_open = matrix(1322, nrow=1, ncol=length(store_ids))
+
+View(item_store_sales)
+id_frequency = data.table(item_ids, rep(0,length(train_ids)))
+for (i in 1:length(item_ids)) {
+  total_transaction_days = sum(item_store_sales[i,])
+  days_open_of_stores_w_item = 0
+  for (j in 1:length(store_ids)) {
+    if (item_store_sales[i,j] > 0) {
+      days_open_of_stores_w_item = days_open[1,store_ids[j]] + days_open_of_stores_w_item
+    }
+  }
+  id_frequency[id_frequency$item_ids==item_ids[i]] = total_transaction_days / days_open_of_stores_w_item
+}
+```
+
+```{r}
+train_ids = unique(train_last2weeks$id)
+transaction_recorded = rep(0,length(train_ids))
+id_frequency = data.table(train_ids, transaction_recorded)
+colnames(id_frequency) = c("id", "nbr_transactions")
+
+total_store_train = 0
+for (cur_store_nbr in stores$store_nbr) {
+  total_store_train = total_store_train + 1
+  store_train = filter(train_last2weeks, train_last2weeks$store_nbr == cur_store_nbr)
+  for (cur_date in unique(store_train$date)) {
+    total_store_train = total_store_train + 1
+    store_day_train = filter(store_train, store_train$date == cur_date)
+    for (cur_id in unique(store_day_train$id)) {
+      id_frequency[id==cur_id]$nbr_transactions = id_frequency[id==cur_id]$nbr_transactions + 1
+    }
+  }
+}
+id_frequency[, prop_store_train := nbr_transactions/total_store_train]
+View(id_frequency)
 ```
 
 THIS CHUNK: Joining tables and renaming variables
