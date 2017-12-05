@@ -231,8 +231,8 @@ for (i in 1:length(item_ids)) {
 # Need actual matrix of days open for every store
 days_open = matrix(1322, nrow=1, ncol=length(store_ids))
 
-View(item_store_sales)
 id_frequency = data.table(item_ids, rep(0,length(train_ids)))
+colnames(id_frequency) = c("id", "ratio")
 for (i in 1:length(item_ids)) {
   total_transaction_days = sum(item_store_sales[i,])
   days_open_of_stores_w_item = 0
@@ -243,6 +243,9 @@ for (i in 1:length(item_ids)) {
   }
   id_frequency[id_frequency$item_ids==item_ids[i]] = total_transaction_days / days_open_of_stores_w_item
 }
+
+popular_items = filter(id_frequency, ratio>0.95)
+
 ```
 
 # 5. Transacted: time series (Justin)
