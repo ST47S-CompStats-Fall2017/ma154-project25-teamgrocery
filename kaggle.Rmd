@@ -334,6 +334,46 @@ ggplot(data = sales_per_day) + geom_line(aes(x = day_count, y = sales)) + expand
 ```
 
 
+THIS CHUNK: 
+1. Set the time series variable
+2. Check for Stationarity
+3. Difference to get stationarity
+4. Apply ARIMA model
+```{r}
+View(s_train)
+library(dplyr)
+library('ggplot2')
+#install.packages("forecast")
+library('forecast')
+library('tseries')
+library(data.table)
+#summarize unit sales by class for the day
+daily_sales <- s_train %>% group_by(date, item_family) %>% summarise(daily_class_sales = sum(unit_sales))
+#Just the vector of daily sales
+daily_sales_ts <- daily_sales %>% filter(item_family == "GROCERY I")
+ds_ts <- ts(daily_sales_ts$daily_class_sales, frequency = 7)
+ds_adf <- adf.test(ds_ts, alternative = "stationary")
+ds_adf
+```
+
+
+```{r}
+
+time_series = data.table()
+time_series_adf = data.table()
+
+z <- 1
+for (i in unique(daily_sales$item_family)){
+  daily_sales_ts <- daily_sales %>% filter(item_family == i)
+  ds_ts <- ts(daily_sales_ts$daily_class_sales, frequency = 7)
+  time_series [,(i) := (ds_ts)]
+  #time_series_adf <- c(time_series_adf, adf.test(time_series[z], alternative = "stationary"))
+  z <- z + 1
+}
+View(time_series[1])
+time_series
+```
+
 
 THIS CHUNK: Build and test the model
 ```{r}
