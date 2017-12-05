@@ -33,6 +33,10 @@ library('data.table')
 library('lubridate')
 library('caret')
 
+#install.packages('tseries')
+library(tseries)
+
+
 ```
 
 ```{r}
@@ -50,10 +54,6 @@ holidays <- fread("holidays_events.csv")
 items <- fread("items.csv")
 oil <- fread("oil.csv")
 stores <- fread("stores.csv")
-
-# Make sandbox train and test data
-set.seed(888)
-sandbox <- train[sample(.N, 15000),]
 
 
 ```
@@ -74,26 +74,75 @@ cols <- names(stores)[-1] # Except for store_nbr
 setnames(stores, (cols), paste("store_", (cols), sep=""))
 
 # Join with holidays_events
-setkey(sandbox, date)
-setkey(holidays, date)
-sandbox <- merge(sandbox, holidays, all.x = TRUE)
+#setkey(train, date)
+#setkey(holidays, date)
+#train <- merge(train, holidays, all.x = TRUE)
 
 # Join with items
-setkey(sandbox, item_nbr)
+setkey(train, item_nbr)
 setkey(items, item_nbr)
-sandbox <- merge(sandbox, items, all.x = TRUE)
+train <- merge(train, items, all.x = TRUE)
 
 # Join with oil
-setkey(sandbox, date)
+setkey(train, date)
 setkey(oil, date)
-sandbox <- merge(sandbox, oil, all.x = TRUE)
+train <- merge(train, oil, all.x = TRUE)
 
 # Join with stores
-setkey(sandbox, store_nbr)
+setkey(train, store_nbr)
 setkey(stores, store_nbr)
-sandbox <- merge(sandbox, stores, all.x = TRUE)
+train <- merge(train, stores, all.x = TRUE)
 
-setkey(sandbox, id)
+setkey(train, id)
+
+```
+
+THIS CHUNK: Sample a sandbox
+```{r}
+
+# Reduced data set to work with
+set.seed(888)
+p <- 15000/125497040 # Proportion we want to sample
+setkey(train, date)
+ndt <- train[, .(n = .N), by = date]
+indices <- c()
+start <- end <- 1
+num_days <- nrow(ndt)
+for (i in 1:num_days) {
+  n <- ndt[i,n]
+  end <- start + n - 1
+  new_indices <- sample(start:end, as.integer(n * p))
+  new_indices
+  indices <- c(indices, new_indices)
+  start <- end + 1
+}
+sandbox <- train[indices,]
+
+```
+
+THIS CHUNK: Check if there is a daily trend
+```{r}
+
+avg_sales_data <- sandbox[,j = .(total_sales = sum(unit_sales), n = .N, avg_sales = sum(unit_sales)/.N), by = date]
+avg_sales_data$ID <- seq.int(nrow(avg_sales_data))
+ggplot(data = avg_sales_data) + geom_line(aes(x = ID, y = avg_sales))
+
+# IMPORTANT - shows that avg. sales go up a bit as total sales go up
+plot(avg_sales ~ total_sales, data = avg_sales_data) 
+sales_lm <- lm(avg_sales ~ total_sales, data = avg_sales_data)
+abline(sales_lm)
+sales_lm
+
+
+week_sales_data <- avg_sales_data[,j = .(total_sales, n, week = 1 + as.integer(ID/7))]
+week_sales_data <- week_sales_data[,.(total_sales, n, avg_sales = sum(total_sales) / sum(n)),by = week]
+
+wsd_sum <- week_sales_data[,j=.(total=sum(total_sales),N = sum(n)), by=.(week %% 7)]
+
+ggplot(data = week_sales_data) + geom_line(aes(x = week, y = avg_sales))
+
+adf.test(avg_sales_data$avg_sales, k = 20)
+adf.test(week_sales_data$avg_sales, k = 20)
 
 ```
 
@@ -196,8 +245,10 @@ setDT(s_test)
 
 ```
 
+
 THIS CHUNK: Summary statistics and data visualization (graphs)
 ```{r}
+
 #Let's create some summary statistics
 for (i in 1:ncol(s_train)){
 eval(parse(text = paste(paste("sales_table_",names(s_train)[i]," = ",sep = ""),
@@ -328,11 +379,9 @@ for (i in 1:nrow(sales_per_day)) {
 }
 ggplot(data = sales_per_day) + geom_line(aes(x = day_count, y = sales)) + expand_limits(y = 0)
 
-
 # Step 3: linearize/difference???
 
 ```
-
 
 
 THIS CHUNK: Build and test the model
