@@ -245,7 +245,7 @@ for (i in 1:length(item_ids)) {
 }
 
 popular_items = filter(id_frequency, ratio>0.95)
-
+popular_items_ids = popular_items$id
 ```
 
 # 5. Transacted: time series (Justin)
