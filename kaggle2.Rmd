@@ -229,6 +229,11 @@ for (i in 1:length(item_ids)) {
 }
 
 # Need actual matrix of days open for every store
+total_days <- max(sandbox$day_count)
+store_data <- sandbox[,j = .(days_open = (total_days) - min(day_count)), by=store_nbr]
+setkey(store_data, store_nbr)
+days_open <- store_data$days_open
+
 days_open = matrix(1322, nrow=1, ncol=length(store_ids))
 
 id_frequency = data.table(item_ids, rep(0,length(train_ids)))
