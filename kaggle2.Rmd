@@ -102,18 +102,18 @@ train <- merge(train, stores, all.x = TRUE)
 
 ```
 
-# 2. Sample a sandbox
+# 2. Sample a sandbox (only in last 2 weeks)
 ```{r}
 
 # Reduced data set to work with
 set.seed(888)
-p <- 15000/125497040 # Proportion we want to sample
+p <- 15000/(125497040 - 123926072) # Proportion we want to sample (total, num. before Aug. 1 2016)
 setkey(train, date)
 ndt <- train[, .(n = .N), by = date]
 indices <- c()
-start <- end <- 1
+start <- end <- 1 + 123926072
 num_days <- nrow(ndt)
-for (i in 1:num_days) {
+for (i in (num_days - 14):num_days) {
   n <- ndt[i,n]
   end <- start + n - 1
   new_indices <- sample(start:end, as.integer(n * p))
@@ -282,19 +282,21 @@ time_series
 # - s_popular (has popularity column)
 # - s_not_popular
 
+set.seed(888)
+
 # Train/test data for popular items
-s_p_indices <- sample(s_popular, 0.7*nrow(s_popular))
+s_p_indices <- sample(1:nrow(s_popular), 0.7*nrow(s_popular))
 s_p_train <- s_popular[s_p_indices]
 s_p_test <- s_popular[-s_p_indices]
 
 # Train/test data for unpopular items
-s_np_indices <- sample(s_not_popular, 0.7*nrow(s_not_popular))
-s_np_train <- s_popular[s_np_indices]
-s_np_test <- s_popular[-s_np_indices]
+s_np_indices <- sample(1:nrow(s_not_popular), 0.7*nrow(s_not_popular))
+s_np_train <- s_not_popular[s_np_indices]
+s_np_test <- s_not_popular[-s_np_indices]
 
 # Variables to use for the random forest
-s_np_cols <- c("unit_sales", item_families, paste("Cluster",store_clusters), store_cities, paste("Store Type", store_types), weekday_names)
-s_p_cols <- c(s_np_cols, "popularity")
+s_p_cols <- s_np_cols <- c("unit_sales", item_families, paste("Cluster",store_clusters), store_cities, paste("Store Type", store_types), weekday_names)
+#s_p_cols <- c(s_p_cols, "popularity") TODO once Justin adds ARIMA-generated column
 
 # Model for popular items
 p_model_data <- s_p_train[,s_p_cols, with=FALSE]
@@ -360,5 +362,37 @@ onpromotion_sales <- sandbox[,j = .(mean_sales = mean(unit_sales)), by = onpromo
 ggplot(data = onpromotion_sales) + geom_col(aes(x = onpromotion, y = mean_sales)) +
   expand_limits(y = 0)
 
+
+```
+
+# B. Victor - code for counting popular items
+```{r}
+
+# Make data table for which items are sold every day
+
+tmp <- train[date == "2017-08-01"]
+cut <- min(tmp$id)
+
+setkey(train, id)
+t_pop <- train[id >= (cut), j = .(n = .N), by = .(store_nbr, item_nbr)]
+t_pop[,popular := n == 15]
+
+# Percent sold every day
+hist(t_pop$n)
+
+```
+
+# C. Victor - code for splitting sandbox based off popularity
+```{r}
+
+# Split sandbox accordingly
+setDT(sandbox)
+setDT(t_pop)
+setkey(sandbox, store_nbr, item_nbr)
+setkey(t_pop, store_nbr, item_nbr)
+s_all <- merge(sandbox, t_pop, all.x = TRUE)
+
+s_popular <- s_all[popular == TRUE]
+s_not_popular <- s_all[popular == FALSE]
 
 ```
