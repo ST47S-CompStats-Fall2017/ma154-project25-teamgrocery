@@ -197,82 +197,114 @@ sandbox[,day_count := 365 * (year - 2013) + day]
 # 4. Split into transacted/non-transacted (Todo Thomas)
 
 ```{r}
-item_ids = unique(sandbox$id)
+last_two_weeks = filter(train, as.Date(train$date) >= as.Date("2017-08-1"))
+#last_two_weeks = data.table(fread("train2weeks.csv"))
+item_ids = unique(last_two_weeks$id)
 store_ids = unique(stores$store_nbr)
 item_store_sales = data.table(matrix(0, nrow=length(item_ids), ncol=length(store_ids)))
-for (i in 1:length(item_ids)) {
-  for (j in 1:length(store_ids)) {
-    cur_item_id = item_ids[i]
-    cur_store_nbr = store_ids[j]
-    item_store_sales[i,j] = nrow(sandbox[sandbox$id==cur_item_id && sandbox$store_nbr==cur_store_nbr])
-  }
+rownames(paste(item_ids))
+colnames(paste(store_ids))
+for (i in 1:nrow(last_two_weeks)) {
+  obs = last_two_weeks[i,]
+  item_id = obs$id
+  store_id = obs$store_nbr
+  item_store_sales[match(item_id, item_ids), match(store_id, store_ids)] = 
+    item_store_sales[match(item_id, item_ids), match(store_id, store_ids)] + 1
 }
 
 # Need actual matrix of days open for every store
-total_days <- max(sandbox$day_count)
-store_data <- sandbox[,j = .(days_open = (total_days) - min(day_count)), by=store_nbr]
-setkey(store_data, store_nbr)
-days_open <- store_data$days_open
+# total_days <- max(last_two_weeks$day_count)
+# store_data <- last_two_weeks[,j = .(days_open = (total_days) - min(day_count)), by=store_nbr]
+# setkey(store_data, store_nbr)
+# days_open <- store_data$days_open
 
-days_open = matrix(1322, nrow=1, ncol=length(store_ids))
+days_open = matrix(15, nrow=1, ncol=length(store_ids))
 
-id_frequency = data.table(item_ids, rep(0,length(train_ids)))
-colnames(id_frequency) = c("id", "ratio")
+item_store_sales = data.frame(item_store_sales)
+
+id_frequency = data.frame(item_ids, rep(0,length(item_ids)), rep(0,length(item_ids)))
+colnames(id_frequency) = c("id", "store_days", "ratio")
 for (i in 1:length(item_ids)) {
   total_transaction_days = sum(item_store_sales[i,])
   days_open_of_stores_w_item = 0
   for (j in 1:length(store_ids)) {
     if (item_store_sales[i,j] > 0) {
-      days_open_of_stores_w_item = days_open[1,store_ids[j]] + days_open_of_stores_w_item
+      days_open_of_stores_w_item = days_open_of_stores_w_item + days_open[1,store_ids[j]]
     }
   }
-  id_frequency[id_frequency$item_ids==item_ids[i]] = total_transaction_days / days_open_of_stores_w_item
+  id_frequency[i, 2] = total_transaction_days
+  id_frequency[i, 3] = total_transaction_days / days_open_of_stores_w_item
 }
 
-popular_items = filter(id_frequency, ratio>0.95)
+fwrite(id_frequency, "id_frequency.csv")
 
+popular_items = filter(id_frequency, store_days==15)
+popular_items_ids = popular_items$id
 ```
 
 # 5. Transacted: time series (Justin)
 
 THIS CHUNK: 
 1. Set the time series variable
-2. Check for Stationarity
-3. Difference to get stationarity
-4. Apply ARIMA model
+2. Apply ARIMA model on an Example
 ```{r}
-View(s_train)
+#View(s_train)
 library(dplyr)
 library('ggplot2')
 #install.packages("forecast")
 library('forecast')
 library('tseries')
 library(data.table)
-#summarize unit sales by class for the day
-daily_sales <- s_train %>% group_by(date, item_family) %>% summarise(daily_class_sales = sum(unit_sales))
 
-daily_sales_ts <- daily_sales %>% filter(item_family == "GROCERY I")
-ds_ts <- ts(daily_sales_ts$daily_class_sales, frequency = 7)
-ds_adf <- adf.test(ds_ts, alternative = "stationary")
-ds_adf
+#summarize unit sales by class for the day
+daily_sales <- s_train %>% group_by(date,item_family) %>% summarise(daily_class_sales = mean(unit_sales)) %>% filter(date > as.Date('2016-1-1'))
+grocery_daily_sales = daily_sales %>% filter(item_family == "BEVERAGES")
+grocery_daily_sales
+ds_ts <- ts(grocery_daily_sales$daily_class_sales, frequency = 7)
+ds_ts <- tsclean(ds_ts)
+plot(ds_ts)
+fit <- auto.arima(ds_ts, stepwise = FALSE, approximation = FALSE)
+fore <- forecast(fit, h= 14)
+plot(fore)
+fore$mean
 ```
 
-
+THIS CHUNK:
+1. Generate Data Table of Arima Forecasts by Class
 ```{r}
+library(tidyr)
+family_data <- data.frame()
+daily_sales <- s_train %>% group_by(date,item_family) %>% summarise(daily_class_sales = mean(unit_sales)) %>% filter(date > as.Date('2016-1-1')) #take the data from 2016 onwards 
 
-time_series = data.table()
-time_series_adf = data.table()
-
-z <- 1
+#checks to see if there are enough obervations aka we need more data points
+#we need at least enough data points for each class to have an observation each day
 for (i in unique(daily_sales$item_family)){
-  daily_sales_ts <- daily_sales %>% filter(item_family == i)
-  ds_ts <- ts(daily_sales_ts$daily_class_sales, frequency = 7)
-  time_series [,(i) := (ds_ts)]
-  #time_series_adf <- c(time_series_adf, adf.test(time_series[z], alternative = "stationary"))
-  z <- z + 1
+  daily_sales_class <- daily_sales %>% filter(item_family == i)
+  if (nrow(daily_sales_class)<150){
+    daily_sales <- daily_sales %>% filter(item_family != i)
+  }
 }
-View(time_series[1])
-time_series
+
+
+for (i in unique(daily_sales$item_family)){
+  daily_sales_ts <- daily_sales %>% filter(item_family == i) #filter by the class
+  ds_ts <- ts(daily_sales_ts$daily_class_sales, frequency = 7) #create the time series with a week period
+  ds_ts <- tsclean(ds_ts) #remove outliers
+  ds_ts_arima <- auto.arima(ds_ts, stepwise = FALSE, approximation = FALSE) #take out stepwise and 
+  #approximation to make it go faster
+  forecast <- forecast(ds_ts_arima, h= 14) #forecast 14 days ahead
+  forecast_values <- forecast$mean #obtain the values for the forecast
+  family_data <- rbind(family_data, forecast_values) #add these to the dataframe
+}
+
+
+family_data <- cbind(unique(daily_sales$item_family), family_data) #add family names to data frame
+colnames(family_data) <- c("Family",1:14)
+family_data
+tidy_family_data <- gather(family_data,"Day","Sales",2:15) #tidy up
+tidy_family_data$Day <- as.numeric(tidy_family_data$Day)
+daily_sales_ts
+ggplot() + geom_line(data = tidy_family_data, aes(x= Day, y= Sales, color = Family)) #plot
 ```
 
 # 6. Transacted: random forest
