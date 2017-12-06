@@ -54,11 +54,16 @@ stores <- fread("stores.csv")
 
 ```
 
-# Sections:
+# SECTIONS
 # 1. Joining tables
 # 2. Sample a sandbox
 # 3. Add variables
 # 4. Split into transacted/non-transacted
+# 5. ARIMA for highly transacted items
+# 6. RF models
+
+# Extra stuff
+# A. Data visualization
 
 # 1. Joining tables
 ```{r}
@@ -182,32 +187,8 @@ for (i in 1:length(store_types)) {
   sandbox[,(paste("Store Type", cur_store_type)) := store_type == (cur_store_type)]
 }
 
-#I want to convert the dates to days of the week as a predictive variable
-sandbox <- sandbox %>% mutate( days_of_week = weekdays(as.Date(sandbox$date,'%Y-%m-%d')))
-
-#General idea of when holidays happen in a specific location
-sandbox <- sandbox %>% mutate(holiday = !is.na(holiday_type) &
-                                        !holiday_transferred &
-                                         holiday_type != "Work Day" &
-                                        (holiday_locale == "National"|
-                                        holiday_locale_name == store_city |
-                                        holiday_locale_name == store_state))
-
-#Work day variable
-sandbox <- sandbox %>% mutate(work_day = holiday_type == "Work Day" & !is.na(holiday_type))
-
-#Bring over holiday type where it is relevant to the sale
-sandbox <- sandbox %>% mutate(holiday_type_relevant = ifelse(holiday, paste("holiday_",holiday_type,sep = ""), "holiday_None") )
-
-setDT(sandbox)
-holiday_type_relevant_vals <- unique(sandbox$holiday_type_relevant)
-for (i in 1:length(holiday_type_relevant_vals)) {
-  cur_holiday_type_relevant <- holiday_type_relevant_vals[i]
-  sandbox[,(cur_holiday_type_relevant) := 
-            holiday_type_relevant == (cur_holiday_type_relevant)]
-}
-
 # Adding months and days since Jan. 1 2013 (both starting at 1)
+setDT(sandbox)
 sandbox[,month_count := 12 * (year - 2013) + month]
 sandbox[,day_count := 365 * (year - 2013) + day]
 
@@ -216,7 +197,6 @@ sandbox[,day_count := 365 * (year - 2013) + day]
 # 4. Split into transacted/non-transacted (Todo Thomas)
 
 ```{r}
-sandbox = fread("sandbox.csv")
 item_ids = unique(sandbox$id)
 store_ids = unique(stores$store_nbr)
 item_store_sales = data.table(matrix(0, nrow=length(item_ids), ncol=length(store_ids)))
@@ -296,5 +276,89 @@ time_series
 ```
 
 # 6. Transacted: random forest
+```{r}
 
-# 7. Non-transacted: random forest
+# Need
+# - s_popular (has popularity column)
+# - s_not_popular
+
+# Train/test data for popular items
+s_p_indices <- sample(s_popular, 0.7*nrow(s_popular))
+s_p_train <- s_popular[s_p_indices]
+s_p_test <- s_popular[-s_p_indices]
+
+# Train/test data for unpopular items
+s_np_indices <- sample(s_not_popular, 0.7*nrow(s_not_popular))
+s_np_train <- s_popular[s_np_indices]
+s_np_test <- s_popular[-s_np_indices]
+
+# Variables to use for the random forest
+s_np_cols <- c("unit_sales", item_families, paste("Cluster",store_clusters), store_cities, paste("Store Type", store_types), weekday_names)
+s_p_cols <- c(s_np_cols, "popularity")
+
+# Model for popular items
+p_model_data <- s_p_train[,s_p_cols, with=FALSE]
+p_model <- train(unit_sales ~ . , data=p_model_data, method="rf",
+                  trControl = trainControl(method="oob"),  # Use the OOB error rate 
+                  ntree=500, tuneGrid = data.frame(mtry=((length(s_p_cols) - 1))/3),
+                  importance = TRUE)  # need this for variable importance below
+p_predictions <- predict(p_model, newdata = s_p_test)
+p_actual <- s_p_test$unit_sales
+p_accuracy <- sum((log(p_predictions + 1) - log(p_actual + 1)) ** 2) / length(p_predictions)
+p_accuracy
+
+# Model for unpopular items
+np_model_data <- s_p_train[,s_np_cols, with=FALSE]
+np_model <- train(unit_sales ~ . , data=np_model_data, method="rf",
+                  trControl = trainControl(method="oob"),  # Use the OOB error rate 
+                  ntree=500, tuneGrid = data.frame(mtry=((length(s_np_cols) - 1))/3),
+                  importance = TRUE)  # need this for variable importance below
+np_predictions <- predict(np_model, newdata = s_np_test)
+np_actual <- s_np_test$unit_sales
+np_accuracy <- sum((log(np_predictions + 1) - log(np_actual + 1)) ** 2) / length(np_predictions)
+np_accuracy
+
+```
+
+
+# EXTRA STUFF
+
+# A. Data visualization
+```{r}
+
+# TODO
+# - separate visualization for highly vs. non-highly-transacted items
+# - divide by stores_open (add variable for that)
+
+# How store_cluster affects sales
+store_cluster_sales <- sandbox[,j = .(mean_sales = mean(unit_sales)), by = store_cluster]
+ggplot(data = store_cluster_sales) + geom_col(aes(x = store_cluster, y = mean_sales)) +
+  expand_limits(y = 0)
+
+# How store_city affects sales
+store_city_sales <- sandbox[,j = .(mean_sales = mean(unit_sales)), by = store_city]
+ggplot(data = store_city_sales) + geom_col(aes(x = store_city, y = mean_sales)) +
+  expand_limits(y = 0)
+
+# How item_perishable affects sales
+item_perishable_sales <- sandbox[,j = .(mean_sales = mean(unit_sales)), by = item_perishable]
+ggplot(data = item_perishable_sales) + geom_col(aes(x = item_perishable, y = mean_sales)) +
+  expand_limits(y = 0)
+
+# How store_type affects sales
+store_type_sales <- sandbox[,j = .(mean_sales = mean(unit_sales)), by = store_type]
+ggplot(data = store_type_sales) + geom_col(aes(x = store_type, y = mean_sales)) +
+  expand_limits(y = 0)
+
+# How weekday affects sales
+weekday_sales <- sandbox[,j = .(mean_sales = mean(unit_sales)), by = weekday]
+ggplot(data = weekday_sales) + geom_col(aes(x = weekday, y = mean_sales)) +
+  expand_limits(y = 0)
+
+# How onpromotion affects sales
+onpromotion_sales <- sandbox[,j = .(mean_sales = mean(unit_sales)), by = onpromotion]
+ggplot(data = onpromotion_sales) + geom_col(aes(x = onpromotion, y = mean_sales)) +
+  expand_limits(y = 0)
+
+
+```
