@@ -246,7 +246,7 @@ for (i in 1:length(item_ids)) {
 
 fwrite(id_frequency, "id_frequency.csv")
 
-popular_items = filter(id_frequency, store_days==15)
+popular_items = filter(id_frequency, store_days_sold/store_days >= 0.95)
 popular_items_ids = popular_items$id
 
 popular_train = subset(train, id %in% popular_items_ids)
