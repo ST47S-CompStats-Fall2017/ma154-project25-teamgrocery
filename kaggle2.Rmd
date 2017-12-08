@@ -197,14 +197,14 @@ sandbox[,day_count := 365 * (year - 2013) + day]
 # 4. Split into transacted/non-transacted (Todo Thomas)
 
 ```{r}
-#last_two_weeks = data.table(fread("train2weeks.csv"))
+last_two_weeks = data.table(fread("train2weeks.csv"))
 #test_const = 100
 #item_ids = unique(last_two_weeks$id)[1:test_const]
-#store_ids = 1:54
+store_ids = 1:54
 
-last_two_weeks = filter(train, as.Date(train$date) >= as.Date("2017-08-1"))
+#last_two_weeks = filter(train, as.Date(train$date) >= as.Date("2017-08-1"))
 item_ids = unique(last_two_weeks$id)
-store_ids = unique(stores$store_nbr)
+#store_ids = unique(stores$store_nbr)
 
 item_store_sales = data.table(matrix(0, nrow=length(store_ids), ncol=length(item_ids)))
 colnames(item_store_sales) = paste(item_ids)
