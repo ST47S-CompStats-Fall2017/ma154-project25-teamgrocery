@@ -1,5 +1,5 @@
 ---
-title: "testdata"
+title: "Forecasting Grocery Sales"
 output: pdf_document
 ---
 
@@ -7,71 +7,111 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Install packages
+# IMPORTANT NOTES
+
 ```{r}
 
-# Load data: only need to run once
+# 1. Set to TRUE to import all relevant CSV files. Only need to do this once
+LOAD_CSV_DATA <- FALSE
 
-#install.packages("data.table")
-#library(data.table)
-#ships <- fread('https://raw.githubusercontent.com/hopperrr/ellis-immigration-by-ship/gh-pages/data/trips.tsv')
+# 2. Set this value to TRUE to install all of the relevant packages. Only need to do this once
+DO_INSTALL_PACKAGES <- FALSE
 
-# Total number of people from each ship
+# 3. Set TRUE to use small sample. Set to FALSE to use more data, which may take hours  
+SMALLER_SAMPLE <- TRUE
 
+# 4. Create a directory named "plots" on the same level as this .Rmd file. This code assumes the existence of that directory, saves all charts there
+
+```
+
+TABLE OF CONTENTS:
+
+SECTIONS:
+
+A -- Setup:
+
+# 1. Install packages
+# 2. Load data from CSV
+
+B -- Main Code:
+
+# 1. Joining tables
+# 2. Sample training data, merge into one big table
+# 3. Add variables to table
+# 4. Split big table into separate rf, arima, and test tables
+# 5. Train ARIMA model
+# 6. Add ARIMA predictions to rf and test tables
+# 7. Train RF models
+# 8. Predict test data
+
+C -- Data Visualization:
+
+# 1. Different variables' influence on sales
+# 2. Variable importance for two random forests
+# 3. Plotting errors in sample test
+
+# Section A -- Setup
+
+# 1. Install packages
+```{r}
+
+if (DO_INSTALL_PACKAGES) {
+  install.packages("data.table")
+  install.packages('ggplot2')
+  install.packages('ggthemes')
+  install.packages('scales')
+  install.packages('dplyr')
+  install.packages('mice')
+  install.packages('class')
+  install.packages('lubridate')
+  install.packages('caret')
+  install.packages('tseries')
+  install.packages("forecast")
+  install.packages('tidyr')
+}
+
+library('data.table')
 library('ggplot2')
-#install.packages('ggthemes')
 library('ggthemes')
 library('scales')
 library('dplyr')
-#install.packages("mice")
 library('mice')
-#install.packages("randomForest")
-library('randomForest')
-#install.packages("class")
 library('class')
-#install.packages("data.table")
-library('data.table')
 library('lubridate')
 library('caret')
-
-#install.packages('tseries')
-library(tseries)
-#install.packages("forecast")
+library('tseries')
 library('forecast')
-
+library('tidyr')
 
 ```
 
-# Load data from CSV
+# 2. Load data from CSV
 ```{r}
 
-# This data import takes a while
-#train <- fread("train.csv")
-
-# This date import is quick
-holidays <- fread("holidays_events.csv")
-items <- fread("items.csv")
-oil <- fread("oil.csv")
-stores <- fread("stores.csv")
-
-test <- fread("test.csv")
+if (LOAD_CSV_DATA) {
+  train <- fread("train.csv")
+  holidays <- fread("holidays_events.csv")
+  items <- fread("items.csv")
+  oil <- fread("oil.csv")
+  stores <- fread("stores.csv")
+  test <- fread("test.csv")
+}
 
 ```
 
-# SECTIONS
-# 1. Joining tables
-# 2. Sample a sandbox
-# 3. Add variables
-# 4. Split into transacted/non-transacted
-# 4b. Split sandbox into transacted/non-transacted
-# 5. ARIMA for highly transacted items
-# 6. RF models
 
-# Extra stuff
-# A. Data visualization
+# Section B -- Main code
 
 # 1. Joining tables
+# 2. Sample training data, merge into one big table
+# 3. Add variables to table
+# 4. Split big table into separate rf, arima, and test tables
+# 5. Train ARIMA model
+# 6. Add ARIMA predictions to rf and test tables
+# 7. Train RF models
+# 8. Predict test data
 
+# 1. Joining tables
 ```{r}
 # Set names
 cols <- names(holidays)[-1] # Except for date
@@ -82,6 +122,18 @@ setnames(items, (cols), paste("item_", (cols), sep=""))
 
 setnames(oil, "dcoilwtico", "oil_price")
 
+# Remove NA values from oil by using last recorded price
+set(oil, 1L, "oil_price", oil[2,oil_price]) # First row was NA, so use value of 2nd row
+oil_price_na <- is.na(oil$oil_price)
+last_oil_price <- oil[1,oil_price]
+for (i in 1:length(oil_price_na)) {
+  if (oil_price_na[i]) {
+    set(oil, i, "oil_price", last_oil_price)
+  } else {
+    last_oil_price <- oil[i,oil_price]
+  }
+}
+
 cols <- names(stores)[-1] # Except for store_nbr
 setnames(stores, (cols), paste("store_", (cols), sep=""))
 
@@ -89,6 +141,24 @@ setnames(stores, (cols), paste("store_", (cols), sep=""))
 #setkey(train, date)
 #setkey(holidays, date)
 #train <- merge(train, holidays, all.x = TRUE)
+
+# Join with items
+setkey(train, item_nbr)
+setkey(items, item_nbr)
+train <- merge(train, items, all.x = TRUE)
+
+# Join with oil
+setkey(train, date)
+setkey(oil, date)
+train <- merge(train, oil, all.x = TRUE)
+
+# Join with stores
+setkey(train, store_nbr)
+setkey(stores, store_nbr)
+train <- merge(train, stores, all.x = TRUE)
+
+
+# Same, for test data
 
 # Join with items
 setkey(test, item_nbr)
@@ -106,15 +176,16 @@ setkey(stores, store_nbr)
 test <- merge(test, stores, all.x = TRUE)
 ```
 
-# 2. Sample a sandbox (only in last 2 weeks)
+# 2. Sample training data
 ```{r}
 
-num_rf <- 300000 # Currently x10, now x4 from first
-num_arima <- 1000000 # Was 60,000, now x4 from first
-
-# RF Reduced data set to work with (last 15 days)
+# RF dataset: sample from last 15 days
 set.seed(888)
-p <- num_rf/(125497040 - 123926072) # Proportion we want to sample (total, num. before Aug. 1 2016)
+if (SMALLER_SAMPLE) {
+  p <- 100000/(125497040 - 123926072) # Proportion we want to sample (total, num. before Aug. 1 2016)
+} else {
+  p <- 1 # Use all available data for last 15 days
+}
 setkey(train, date)
 ndt <- train[, .(n = .N), by = date]
 indices <- c()
@@ -132,7 +203,7 @@ sandbox_rf <- train[indices,]
 num_rf <- nrow(sandbox_rf)
 
 # ARIMA Reduced data set to work with (whole time period)
-p <- num_arima/125497040
+p <- 1 # Use all training data for arima
 setkey(train, date)
 ndt <- train[, .(n = .N), by = date]
 indices <- c()
@@ -153,7 +224,6 @@ sandbox <- rbind(sandbox_rf, sandbox_arima)
 sandbox <- rbind(sandbox, test, fill=TRUE)
 
 ```
-
 
 # 3. Add variables
 ```{r}
@@ -208,61 +278,20 @@ for (i in 1:length(store_types)) {
 # Adding months and days since Jan. 1 2013 (both starting at 1)
 setDT(sandbox)
 sandbox[,month_count := 12 * (year - 2013) + month]
-#sandbox[,day_count := 365 * (year - 2013) + day]
 
 ```
 
-# 4. Split into transacted/non-transacted (Todo Thomas)
-```
-# Took off the 'r' tag because we only need to run one time
-last_two_weeks = filter(train, as.Date(train$date) >= as.Date("2017-08-1"))
-#last_two_weeks = data.table(fread("train2weeks.csv"))
-item_ids = unique(last_two_weeks$id)
-store_ids = unique(stores$store_nbr)
-item_store_sales = data.table(matrix(0, nrow=length(item_ids), ncol=length(store_ids)))
-rownames(paste(item_ids))
-colnames(paste(store_ids))
-for (i in 1:nrow(last_two_weeks)) {
-  obs = last_two_weeks[i,]
-  item_id = obs$id
-  store_id = obs$store_nbr
-  item_store_sales[match(item_id, item_ids), match(store_id, store_ids)] = 
-    item_store_sales[match(item_id, item_ids), match(store_id, store_ids)] + 1
-}
-
-# Need actual matrix of days open for every store
-# total_days <- max(last_two_weeks$day_count)
-# store_data <- last_two_weeks[,j = .(days_open = (total_days) - min(day_count)), by=store_nbr]
-# setkey(store_data, store_nbr)
-# days_open <- store_data$days_open
-
-days_open = matrix(15, nrow=1, ncol=length(store_ids))
-
-item_store_sales = data.frame(item_store_sales)
-
-id_frequency = data.frame(item_ids, rep(0,length(item_ids)), rep(0,length(item_ids)))
-colnames(id_frequency) = c("id", "store_days", "ratio")
-for (i in 1:length(item_ids)) {
-  total_transaction_days = sum(item_store_sales[i,])
-  days_open_of_stores_w_item = 0
-  for (j in 1:length(store_ids)) {
-    if (item_store_sales[i,j] > 0) {
-      days_open_of_stores_w_item = days_open_of_stores_w_item + days_open[1,store_ids[j]]
-    }
-  }
-  id_frequency[i, 2] = total_transaction_days
-  id_frequency[i, 3] = total_transaction_days / days_open_of_stores_w_item
-}
-
-fwrite(id_frequency, "id_frequency.csv")
-
-popular_items = filter(id_frequency, store_days==15)
-popular_items_ids = popular_items$id
-
-
-```
-# 4b. Splitting sandbox based off popularity
+# 4 Splitting into separate rf, arima, and test tables
 ```{r}
+
+# Make data table for which items are sold every day
+tmp <- train[date == "2017-08-01"]
+cut <- min(tmp$id)
+
+# Choose those sold every day
+setkey(train, id)
+t_pop <- train[id >= (cut), j = .(n = .N), by = .(store_nbr, item_nbr)]
+t_pop[,popular := n == 15]
 
 # Class var: 0 - RF, 1 - ARIMA, 2 - TEST
 setDT(sandbox)
@@ -292,28 +321,10 @@ test_not_popular <- test2[popular == FALSE]
 
 ```
 
-# 5. Transacted: time series (Justin)
-
-THIS CHUNK: 
-1. Set the time series variable
-2. Apply ARIMA model on an Example
-
-THIS CHUNK:
-1. Generate Data Table of Arima Forecasts by Class
+# 5. Train ARIMA Model
 ```{r}
-library(tidyr)
 family_data <- data.frame()
 daily_sales <- arima_popular %>% group_by(date,item_family) %>% summarise(daily_class_sales = mean(unit_sales)) %>% filter(date > as.Date('2016-1-1')) #take the data from 2016 onwards 
-
-#checks to see if there are enough obervations aka we need more data points
-#we need at least enough data points for each class to have an observation each day
-#for (i in unique(daily_sales$item_family)){
-#  daily_sales_class <- daily_sales %>% filter(item_family == i)
-#  if (nrow(daily_sales_class)<150){
-#    daily_sales <- daily_sales %>% filter(item_family != i)
-#  }
-#}
-
 
 for (i in unique(daily_sales$item_family)){
   daily_sales_ts <- daily_sales %>% filter(item_family == i) #filter by the class
@@ -326,23 +337,17 @@ for (i in unique(daily_sales$item_family)){
   family_data <- rbind(family_data, forecast_values) #add these to the dataframe
 }
 
-
 family_data <- cbind(unique(daily_sales$item_family), family_data) #add family names to data frame
 colnames(family_data) <- c("Family",1:14)
-family_data
+
 tidy_family_data <- gather(family_data,"Day","Sales",2:15) #tidy up
 tidy_family_data$Day <- as.numeric(tidy_family_data$Day)
-daily_sales_ts
-ggplot() + geom_line(data = tidy_family_data, aes(x= Day, y= Sales, color = Family)) #plot
-ggsave("plots/arima_forecasts.jpg")
 
 ```
 
-
-
-# 6.0 Merge in "popularity" column into test_popular and rf_popular
-
+# 6. Add ARIMA results to other rf and test tables
 ```{r}
+
 # Clean up to get cols "date", "item_family", "popularity"
 
 train_pop_data <- daily_sales
@@ -371,12 +376,8 @@ test_popular[,popularity := ifelse(is.na(popularity),0,popularity)]
 
 ```
 
-
-
-# 6. Random forest
-
+# 7. Train random forests
 ```{r}
-set.seed(888)
 
 # Train/test data for popular items
 s_p_indices <- sample(1:nrow(rf_popular), 0.7*nrow(rf_popular))
@@ -389,12 +390,14 @@ s_np_train <- rf_not_popular[s_np_indices]
 s_np_test <- rf_not_popular[-s_np_indices]
 
 # Variables to use for the random forest
-s_p_cols <- s_np_cols <- c("unit_sales", item_families, paste("Cluster",store_clusters), store_cities, paste("Store Type", store_types), weekday_names, "days_since_payday")
+s_p_cols <- s_np_cols <- c("unit_sales", item_families, paste("Cluster",store_clusters), store_cities, paste("Store Type", store_types), weekday_names, "days_since_payday", "item_perishable", "oil_price")
 s_p_cols <- c(s_p_cols, "popularity")
 
 # Model for popular items
 p_model_data <- s_p_train[,s_p_cols, with=FALSE]
-p_model <- train(unit_sales ~ . , data=p_model_data, method="rf",
+set.seed(888)
+pmdreduced <- p_model_data[7]
+p_model <- train(unit_sales ~ . , data=pmdreduced, method="rf",
                   trControl = trainControl(method="oob"),  # Use the OOB error rate 
                   ntree=500, tuneGrid = data.frame(mtry=((length(s_p_cols) - 1))/3),
                   importance = TRUE)  # need this for variable importance below
@@ -407,10 +410,7 @@ p_accuracy
 
 # Model for unpopular items
 np_model_data <- s_np_train[,s_np_cols, with=FALSE]
-if(nrow(np_model_data) > nrow(p_model_data)) {
-  indices <- sample(1:nrow(np_model_data), nrow(p_model_data))
-  np_model_data <- np_model_data[indices]
-}
+set.seed(888)
 np_model <- train(unit_sales ~ . , data=np_model_data, method="rf",
                   trControl = trainControl(method="oob"),  # Use the OOB error rate 
                   ntree=500, tuneGrid = data.frame(mtry=((length(s_np_cols) - 1))/3),
@@ -427,6 +427,10 @@ p_model_imp <- varImp(p_model)$importance
 np_model_imp <- varImp(np_model)$importance
 
 
+```
+
+# 8. Predict test data
+```{r}
 
 # Predict test_popular and test_not_popular
 test_p_predictions <- predict(p_model, newdata = test_popular)
@@ -434,18 +438,38 @@ test_p_predictions <- ifelse(test_p_predictions < 0, 0, test_p_predictions)
 test_np_predictions <- predict(np_model, newdata = test_not_popular)
 test_np_predictions <- ifelse(test_np_predictions < 0, 0, test_np_predictions)
 
-```
-
-```{r}
-
+# Output to csv
 final_predictions <- data.table(id = c(test_popular$id, test_not_popular$id), unit_sales = c(test_p_predictions, test_np_predictions))
 fwrite(final_predictions, "final_predictions.csv")
 
 ```
 
-# EXTRA STUFF
 
-# A1. Data visualization
+# Section C -- Data visualization
+
+# 1. Store popularity
+# 2. Arima model
+# 3. Different variables' influence on sales
+# 4. Variable importance for two random forests
+# 5. Plotting errors in sample test
+
+# 1. Store popularity
+```{r}
+
+ggplot(data = t_pop) + geom_histogram(aes(x = n, y =..density..)) + xlab("Number of Days Sold 8/1/16 to 8/15/16") + ggtitle("Distribution of Item Popularities")
+ggsave("plots/popularity_distribution.jpg")
+
+```
+
+# 2. Arima model
+```{r}
+
+ggplot() + geom_line(data = tidy_family_data, aes(x= Day, y= Sales, color = Family)) #plot
+ggsave("plots/arima_forecasts.jpg")
+
+```
+
+# 3. Different variables' influence on sales
 ```{r}
 
 # How item_family affects sales
@@ -491,6 +515,20 @@ ggplot(data = days_since_payday_sales) + geom_col(aes(x = days_since_payday, y =
   expand_limits(y = 0) + 
   xlab("Days Since Payday") + ylab("Mean Unit Sales") + ggtitle("Effect of Days Since Payday for Highly-Transacted Items")
 ggsave("plots/6p.jpg")
+
+# How oil price affects sales
+oil_price_sales <- rf_popular[,j = .(mean_sales = mean(unit_sales)), by = oil_price]
+ggplot(data = oil_price_sales) + geom_smooth(aes(x = oil_price, y = mean_sales)) +
+  expand_limits(y = 0) + 
+  xlab("Oil Price") + ylab("Mean Unit Sales") + ggtitle("Effect of Oil Price for Highly-Transacted Items")
+ggsave("plots/7p.jpg")
+
+# How item perishibality affects sales
+item_perishable_sales <- rf_popular[,j = .(mean_sales = mean(unit_sales)), by = item_perishable]
+ggplot(data = item_perishable_sales) + geom_col(aes(x = item_perishable, y = mean_sales)) +
+  expand_limits(y = 0) + 
+  xlab("Item Perishable") + ylab("Mean Unit Sales") + ggtitle("Effect of Item Perishability for Highly-Transacted Items")
+ggsave("plots/8p.jpg")
 
 
 ## Same code, but for non-highly-transacted items
@@ -539,11 +577,23 @@ ggplot(data = days_since_payday_sales) + geom_col(aes(x = days_since_payday, y =
   xlab("Days Since Payday") + ylab("Mean Unit Sales") + ggtitle("Effect of Days Since Payday for Non-Highly-Transacted Items")
 ggsave("plots/6np.jpg")
 
+# How oil price affects sales
+oil_price_sales <- rf_not_popular[,j = .(mean_sales = mean(unit_sales)), by = oil_price]
+ggplot(data = oil_price_sales) + geom_smooth(aes(x = oil_price, y = mean_sales)) +
+  expand_limits(y = 0) + 
+  xlab("Oil Price") + ylab("Mean Unit Sales") + ggtitle("Effect of Oil Price for Non-Highly-Transacted Items")
+ggsave("plots/7np.jpg")
+
+# How item perishibality affects sales
+item_perishable_sales <- rf_not_popular[,j = .(mean_sales = mean(unit_sales)), by = item_perishable]
+ggplot(data = item_perishable_sales) + geom_col(aes(x = item_perishable, y = mean_sales)) +
+  expand_limits(y = 0) + 
+  xlab("Item Perishable") + ylab("Mean Unit Sales") + ggtitle("Effect of Item Perishability for Non-Highly-Transacted Items")
+ggsave("plots/8np.jpg")
 
 ```
 
-# A2. Variable importance for two random forests
-
+# 4. Variable importance for two random forests
 ```{r, fig.width=3,fig.height=7}
 
 ggplot(varImp(p_model, n = 10))
@@ -553,7 +603,7 @@ ggsave("plots/varimp_np.jpg")
 
 ```
 
-# A3. Plotting errors in sample test
+# 5. Plotting errors in sample test
 ```{r}
 
 p_err <- p_predictions - p_actual
@@ -593,17 +643,3 @@ ggsave("plots/err_scaled_np.jpg")
 
 ```
 
-# B. Victor - code for counting popular items
-
-# Make data table for which items are sold every day
-
-tmp <- train[date == "2017-08-01"]
-cut <- min(tmp$id)
-
-setkey(train, id)
-t_pop <- train[id >= (cut), j = .(n = .N), by = .(store_nbr, item_nbr)]
-t_pop[,popular := n == 15]
-
-# Percent sold every day
-hist(t_pop$n)
-```
