@@ -405,13 +405,98 @@ ggsave("plots/popularity_distribution.jpg")
 
 ```
 
-We divided our data this way because of an important nuance to the data. Interestingly, our training and test data sets are composed of unit sales by item and store conditional on their purchase. We don’t have data on items that weren’t purchased and have no information on which items are in stock. Forecasting sales for items that don’t have data every day would be fitting a model to dangerously incomplete data. Consequently, in order to responsibly use the ARIMA model to pick up patterns over time, we must limit its scope to the frequently purchased items described above.
+We divided our data this way because of an important nuance to the individual observations. Interestingly, our training and test data sets are composed of unit sales by item and store conditional on their purchase. We don’t have data on items that weren’t purchased and have no information on which items are in stock. Forecasting sales for items that don’t have data every day would be fitting a model to dangerously incomplete data. Consequently, in order to responsibly use the ARIMA model to pick up patterns over time, we must limit its scope to the frequently purchased items described above.
 
-The ARIMA Model:
+##The ARIMA Model
 
-The ARIMA model is ideal for short-term forecasts of time series with one seasonal component. Separating this procedure by its distinct components is the best way of understanding its functionality.
+Why did we use this model?
 
-The “I” - Before we can talk about the relationship between a current value and its past instances, it is important to simplify the data. 
+First and foremost, it is important to understand why time series data is different from the average data we input into a standard regression model. From linear regression to random forests, the data scientist usually assumes that his/her data is independently distributed. In other words, there is an expectation that observing one observation will tell us nothing about the values that precede or follow it (https://stats.stackexchange.com/questions/259357/what-is-implied-by-i-i-d). This assumption is clearly violated in time series. Let me demonstrate this assertion with an example. Suppose the United States GDP has been rising over the recent past and analysts hypothesize that the economy is following an upward trend in the business cycle. Let's say (conservatively), that the whole US Economy is 10 dollars and the decade moving average (the average GDP over the last decade) is 5 dollars. What is the United States GDP going to be next year? If your answer to this is "I have no idea" then a linear model will work very well for this data. The observation of a value in one time period tells you nothing about the value in the next. However, most economists would disagree with this reaction. They would likely observe that the US GDP does not move very fast and that patterns in GDP values seem to generally follow a cycle. Consequently, they might put a higher probability on GDP going down and predict that next year's value will be between 9 and 10.5 dollars. On the other hand, if the current GDP was 5 dollars, these forecasts would look very different because of slow GDP movement and a different position in the business cycle (possibly between 4 and 6). Consequently, this example (which is actually especially pertinent since many time series techniques have been centered around predicting business cycles) and many other instances of sequential or time-dependent data will not fit within the constraints and assumptions of normal regression models. 
+
+It is easy to see that grocery sales data fits into this troublesome category. Whether there is: 
+
+1.Weekly seasonality (people tend to buy their groceries when they are free on the weekend)
+2. Yearly seasonality (cartons of ice cream are sold less frequently in the winter)
+3. Long term growth or decline (competitors are entering/leaving the market)
+4. The simple relationship between two observations (if there is a high number of grocery sales on one day, there will be a low sale the next day because people have bought all the tomatoes they needed for the week).
+
+How do we account for these components in our data? This is where ARIMA enters the scene.
+
+ARIMA?
+
+The Autoregressive Integrated Moving Average Model is ideal for short-term forecasts of time series with one seasonal component. Separating this procedure by its distinct components is the best way of understanding its functionality.
+
+The “I” – Before we can talk about the relationship between a current value and its past instances, it is important to simplify the data. Time series patterns can often be separated into three general components.
+
+![Solution](Time_series.png)
+
+The diagram above begins with the data in its raw state. Although this depiction seems very chaotic, it is clear that there are general long-term trends inherent to the data. In order to account for these, the ARIMA model begins by "differencing" the data. This process is simply taking one observation and subtracting the observation behind it in order to remove persistent growth or decline patterns. It can be best understood intuitively with a simple example. Imagine that sales growth increased by one unit every day over the past work week from 1 unit to 5 units. If we differenced this time series, the new sales data would be a sequence of 1's (3-2 = 1, 4-3 = 1 etc.), effectively removing the increasing trend. However, let's say that along with this simplistic pattern, shoppers decide that Wednesday is the most important day to shop and unit sales spike for that day from 3 to 7. After differencing the data, (1,2,7,4,5 --> 1,1,5,-3,1), the upward trend is removed, but the general shape of spiking up to Wednesday and falling back down on Thursday is preserved. The same process and intuition is used to remove seasonality from the data by subtracting a value in the equivalent time period (the value last week, last month or last year depending on the seasonality being observed) from the current value. These differencing manipulations are performed and then stored in the model so that they can be undone when forecasting values. The "integrated" part in ARIMA (the “I”) simply means that this process has been completed. 
+
+Therefore, differencing removes the predictable time patterns from the data (trend and seasonality) in order to isolate the time-independent relationship between a current value and the observations that come before it. "Time-independence" here does not mean that we are no longer dealing with time series. Rather, it suggests that we are now able to observe patterns to the data that do not change with general time periods (trend) or calendar cycles (seasonality). This time series is now referred to as "stationary." There are a couple interesting properties of a stationary process, but the one that will be important moving forward is that values fluctuate around a mean because long term trends and seasonal patterns have been removed.
+
+"AR" and "MA" - However, now that we have isolated the time-independent stationary time series, how do we effectively model it? It seems like we have already removed the patterns that we typically think about when trying to describe time series data, so what else is there to analyze? This is a very legitimate question, and one I definitely considered when learning about the ARIMA model.  The answer is nuanced and very interesting. Again, I believe this is best explained using an example. Suppose that tomato sales in Quito are following a predictable weekly pattern. People typically tend to buy their tomatoes on Sunday, but they also buy them on Saturday after making a curtido de cebolla y tomate (looks delicious - https://www.laylita.com/recipes/curtido-de-cebolla-y-tomate-pickled-red-onion-and-tomato-salad/) for dinner Sunday night. Now, let’s say that one week tomatoes are especially sweet and ripe on Sunday and consumers decide to buy more than usual. How do the normal tomato buying patterns respond to this shock? Do consumers decide to buy more on Saturday because they have determined that tomatoes will be the staple of their dishes for this week? Do they buy less because they already have enough tomatoes to last for the near future? Is their consumption on Saturday unaffected? In this case, I fee like I can confidently forecast that tomato sales will drop below normal levels Saturday and eventually return to normal levels (although you can see how other items may be more ambiguous, e.g. wine and other luxury items). But, how far does it drop and how long does it take to return to normal? These are the questions that the ARMA (without the “I” because the time series has already been differenced) model attempts to answer.
+
+ARMA does this with autoregressive and moving average regression terms.  These two concepts can be best understood as different ways of modeling the relationship between a current value and the values that come before it. Let’s use the examples I outlined above.
+
+In basic mathematical terms, an autoregressive process is:
+
+$Y{_t} = b + aY{_{t-1}} + e{_t}$
+
+In other words, it is simply the current value predicted from the value before it, multiplied by a constant, plus an error term. It is important to remember that stationary time series values will fluctuate around a mean and therefore “a” cannot be greater than 1 (that way the value will eventually progress back to b). This process can be best understood with the hypothetical I propose above in which consumers decide to make tomatoes the staples of their meals for that week. In this case, the effect of an initial shock will persist for a while in smaller and smaller levels throughout the week until it becomes effectively zero.
+
+In basic mathematical terms, a moving average process is:
+
+$Y{_t} = b + ce{_{t-1}} + e{_t}$
+
+In other words, it is simply the current value predicted from the error term before it, multiplied by a constant, plus an error term. While an autoregressive process describes a slow progression toward the mean of the series, the moving average term can model quick changes. This process can be best understood with the hypothetical I propose above in which there is a depression in tomato sales after the increase on Sunday because consumers believe they have enough of this product. In this case, the effect of a shock only lasts for the subsequent time period, after which tomato sales return to their normal levels.
+
+There are other interesting examples here: https://www.analyticsvidhya.com/blog/2015/12/complete-tutorial-time-series-modeling/
+
+
+How does the ARMA model fit AR and MA terms?
+
+![Solution](AR_ACF.png)
+![Solution](MA_ACF.png)
+
+Basically, the ARMA model is fitted by calculating the correlation of the current value with its “lags” aka its historical values. After generating these relationships, we can fit the descriptions detailed above to the plots of these correlations. 
+
+While the first plot looks like an autoregressive process because of the gradual decay, the one below it looks like the sudden decline that is indicative of a moving average process. As you can imagine, the more complicated the ACF plots, the more likely more AR and MA terms (and a combination of both) are needed to fit the pattern. It is also necessary to determine the amount of AR and MA terms by using partial correlation plots (in order to figure exactly which lags are uniquely correlated with the current value, but the math associated with this computation is outside the scope of this explanation). 
+
+See the full explanation of how to fit ARIMA models “by hand” here: https://www.datascience.com/blog/introduction-to-forecasting-with-arima-in-r-learn-data-science-tutorials
+
+How does it all come together?
+
+At the end of the day, it was not incredibly important to understand the nitty-gritty of the ARMA fitting process because the auto.arima() function does it for us! This is very convenient and means we can focus on the intuition of the process and the results. 
+
+The process from a bird’s eye view:
+
+1.	The data is differenced in order to achieve a stationary time series.
+2.	The stationary time series is analyzed using AR and MA processes, which describe how the observations move back towards the mean of a stationary series after a shock.
+3.	The seasonality and trend of the data are added back in order to make forecasts.
+
+Two important limitations:
+
+1.	The ARIMA model can only model one type of seasonality at a time. We identified that weekly seasonality would be the most important dimension, but are definitely missing out on possible yearly seasonality (less ice cream cartons in the summer) because of the limitations of the model in R.
+2.	Lastly, although this is not necessarily a limitation, it is important to realize that the ARMA model is only useful in the very short term because it predicts a regression to the mean (or trend/seasonality once the time series has been un-differenced). After the effects of a shock peter out, the ARIMA model will continue to predict the trend/seasonality of the time series without any variation.
+
+
+What did we use ARIMA for?
+
+At the end of the day, we used the ARIMA model to predict the average unit sales of highly frequented item families over the next two weeks. We were able to get a sense of the popularity of different classes over this short time period by using the forecasts generated by our model. We also learned so much about time series and ARIMA in the process!
+
+An example?
+
+```{r}
+grocery_daily_sales <- daily_sales %>% filter(item_family == "GROCERY I") #filter by the class
+  grocery_ts <- ts(grocery_daily_sales$daily_class_sales, frequency = 7) #create the time series with a week period
+  grocery_ts <- tsclean(grocery_ts) #remove outliers
+  grocery_ts_arima <- auto.arima(grocery_ts) #take out stepwise and 
+  #approximation to make it go faster
+  forecast <- forecast(grocery_ts_arima, h= 14)
+```
+
+
+The results:
 
 ```{r, echo=FALSE}
 
