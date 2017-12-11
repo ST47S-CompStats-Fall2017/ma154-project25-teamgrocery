@@ -5,6 +5,10 @@ date: "December 12, 2017"
 output: pdf_document
 ---
 
+Note that the data to run this file can be downloaded from the following URL:
+https://www.kaggle.com/c/favorita-grocery-sales-forecasting/data
+Since the file is compressed in 7z format, unzipping programatically is not possible.
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
