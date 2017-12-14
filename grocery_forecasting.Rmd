@@ -32,7 +32,7 @@ A diagram of the dual model pipeline is shown below:
 
 We split our dataset into two groups: items that were purchased frequently and infrequently. For a given item, it is considered frequently purchased if for every store it is sold in, it was purchased every day the store was open. For training the model, only the last two weeks were considered (the two weeks leading up to the testing dataset). A graph of the distribution of item popularities is shown below. It shows that a significant proportion of items were sold every day.
 
-![Solution](plots/popularity_distribution.jpg.png)
+![Solution](plots/popularity_distribution.jpg)
 
 We divided our data this way because of an important nuance to the individual observations. Interestingly, our training and test data sets are composed of unit sales by item and store conditional on their purchase. We don’t have data on items that weren’t purchased and have no information on which items are in stock. Forecasting sales for items that don’t have data every day would be fitting a model to dangerously incomplete data. Consequently, in order to responsibly use the ARIMA model to pick up patterns over time, we must limit its scope to the frequently purchased items described above.
 
