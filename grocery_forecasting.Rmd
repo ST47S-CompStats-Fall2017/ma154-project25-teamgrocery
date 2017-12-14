@@ -552,7 +552,7 @@ ggsave("plots/2p.jpg")
 store_cluster_sales <- rf_popular[,j = .(mean_sales = mean(unit_sales)), by = store_cluster]
 ggplot(data = store_cluster_sales) + geom_col(aes(x = store_cluster, y = mean_sales)) +
   expand_limits(y = 0) + 
-  xlab("Sore Cluster") + ylab("Mean Unit Sales") + ggtitle("Effect of Store Cluster for Highly-Transacted Items")
+  xlab("Store Cluster") + ylab("Mean Unit Sales") + ggtitle("Effect of Store Cluster for Highly-Transacted Items")
 ggsave("plots/3p.jpg")
 
 # How store_type affects sales
@@ -613,7 +613,7 @@ ggsave("plots/2np.jpg")
 store_cluster_sales <- rf_not_popular[,j = .(mean_sales = mean(unit_sales)), by = store_cluster]
 ggplot(data = store_cluster_sales) + geom_col(aes(x = store_cluster, y = mean_sales)) +
   expand_limits(y = 0) + 
-  xlab("Sore Cluster") + ylab("Mean Unit Sales") + ggtitle("Effect of Store Cluster for Non-Highly-Transacted Items")
+  xlab("Store Cluster") + ylab("Mean Unit Sales") + ggtitle("Effect of Store Cluster for Non-Highly-Transacted Items")
 ggsave("plots/3np.jpg")
 
 # How store_type affects sales
