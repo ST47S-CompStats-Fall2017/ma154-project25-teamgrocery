@@ -1,5 +1,6 @@
 ---
 title: "Forecasting Grocery Sales"
+author: "Justin Weltz, Victor de Fontnouvelle, and Thomas Thornton"
 output: pdf_document
 date: "December 12, 2017"
 ---
