@@ -2,7 +2,6 @@
 title: "Forecasting Grocery Sales"
 output: pdf_document
 date: "December 12, 2017"
-output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
@@ -137,47 +136,38 @@ We used a sample of 300,000 observations from the 15 days of our dataset that ca
 
 We included the following variables in our random forest, as each had an impact on unit sales:
 
-Item family
 
 ![Solution](plots/1p.jpg)
 ![Solution](plots/1np.jpg)
 
-Item perishable
 
 ![Solution](plots/8p.jpg)
 ![Solution](plots/8np.jpg)
 
-Store city
 
 ![Solution](plots/2p.jpg)
 ![Solution](plots/2np.jpg)
 
-Store cluster
 
 ![Solution](plots/3p.jpg)
 ![Solution](plots/3np.jpg)
 
-Store type
 
 ![Solution](plots/4p.jpg)
 ![Solution](plots/4np.jpg)
 
-Day of week
 
 ![Solution](plots/5p.jpg)
 ![Solution](plots/5np.jpg)
 
-Days since payday
 
 ![Solution](plots/6p.jpg)
 ![Solution](plots/6np.jpg)
 
-Oil price
 
 ![Solution](plots/7p.jpg)
 ![Solution](plots/7np.jpg)
 
-Popularity
 
 ![Solution](plots/popularity_sales.jpg)
 
@@ -206,13 +196,13 @@ We held out 30% of our 300,000 observations as test data, and used these to anal
 ![Solution](plots/err_scaled_p.jpg)
 ![Solution](plots/err_scaled_np.jpg)
 
-Overall our model did a mediocre job predicting sales. The variance was TODO. It often predicted incorrectly, often by a large factor.
+Overall our model did a mediocre job predicting sales. It often predicted incorrectly, often by a large factor.
 
 To predict the Kaggle test set, we first split the test set into highly-transacted and non-highly-transacted items based off our existing classification. Corporacion Favorita included a small number of items not seen in the training set in their test set. We labeled these items as non-highly-transacted because the majority of items are non-highly-transacted. After splitting the data, we applied the appropriate random forest to each half of the data, and merged and submitted the results. Our submission ended up in the 10th percentile. This was a disappointing result.
 
 ## Limitations
 
-The most important improvement we could make to increase the accuracy of our model would be to use more data. We only used 0.25% of the 125 million training observations provided by Corporacion Favorita to train our random forest models. With more computational power, we could train more accurate models, and generate more accurate predictions.
+The most important improvement we could make to increase the accuracy of our model would be to use more data. We only used 0.05% of the 125 million training observations provided by Corporacion Favorita to train our random forest models. With more computational power, we could train more accurate models, and generate more accurate predictions.
 
 Another improvement to the model would be to incorporate external data sets into our analysis. These include data relevant to the holidays, which can impact demand for specific items associated with cultural customs related to the holidays. Second, economic data about the country of Ecuador would also have been useful. Economic data would give a sense of the spending power of customers, and help forecast larger trends in demand of different items. Third, weather data also likely impacted sales. While month gives a good approximation, deviations beyond the average weather cycles likely also affect the demand for certain items. Including external data sets would be useful in making a model that predicts long-term trends, forecasting months into the future. Including these datasets is not as relevant to the challenge we faced, which was only to predict data for the next two weeks. Across the 29 days spanned by the training and test data we used, these measures did not change much. For example, Ecuador’s unemployment rate was 5.4% in 2016 and 5.8% in 2017, and the monthly change was likely even smaller than that.
 
