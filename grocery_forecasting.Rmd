@@ -5,6 +5,10 @@ date: "December 12, 2017"
 output: pdf_document
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
 ## Introduction
 
 Forecasting sales is difficult, yet vitally important for grocery stores. Many items are perishable, and need to be sold soon after arrival. If the store orders too many supplies, they may have to discard a large portion of them. If they don’t order enough, they will miss out on potential sales when they run out of stock. An Ecuadorian-based grocery giant, Corporacion Favorita, relies on rudimentary forecasting techniques. They admit that they “currently rely on subjective forecasting methods with very little data to back them up and very little automation to execute plans.” Corporacion Favorita decided to implement data science methods in order to more accurately forecast sales. They posted a competition on Kaggle where they provided all sales data for all of their stores over a four-year period. 
