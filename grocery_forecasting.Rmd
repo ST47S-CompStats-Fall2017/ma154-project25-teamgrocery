@@ -12,10 +12,10 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 
 # 1. Set to TRUE to import all relevant CSV files. Only need to do this once
-LOAD_CSV_DATA <- FALSE
+LOAD_CSV_DATA <- TRUE
 
 # 2. Set this value to TRUE to install all of the relevant packages. Only need to do this once
-DO_INSTALL_PACKAGES <- FALSE
+DO_INSTALL_PACKAGES <- TRUE
 
 # 3. Set TRUE to use small sample. Set to FALSE to use more data, which may take hours  
 SMALLER_SAMPLE <- TRUE
@@ -113,6 +113,7 @@ if (LOAD_CSV_DATA) {
 
 # 1. Joining tables
 ```{r}
+
 # Set names
 cols <- names(holidays)[-1] # Except for date
 setnames(holidays, (cols), paste("holiday_", (cols), sep=""))
@@ -121,6 +122,7 @@ cols <- names(items)[-1] # Except for item_nbr
 setnames(items, (cols), paste("item_", (cols), sep=""))
 
 setnames(oil, "dcoilwtico", "oil_price")
+setkey(oil, date)
 
 # Remove NA values from oil by using last recorded price
 set(oil, 1L, "oil_price", oil[2,oil_price]) # First row was NA, so use value of 2nd row
@@ -134,13 +136,60 @@ for (i in 1:length(oil_price_na)) {
   }
 }
 
+# Add missing dates.
+
+get_oil_row <- function(y, m, d, price) {
+  m <- formatC(m, width = 2, flag = "0")
+  d <- formatC(d, width = 2, flag = "0")
+  return(list(paste(y,m,d,sep="-"), price))
+}
+
+for (i in 1:length(oil_price_na)) {
+  cur_date <- oil[i, date]
+  cur_year <- as.integer(substr(cur_date,0,4))
+  cur_month <- as.integer(substr(cur_date,6,7))
+  cur_day <- as.integer(substr(cur_date,9,10))
+  cur_oil_price <- oil[i, oil_price]
+  
+  # Don't check the first row
+  if (i != 1) {
+    
+    # Add days last month and to the start of this month
+    if (cur_month != last_month) {
+      
+      # Last month
+      if (31 >= last_day + 1) {
+        for (d in (last_day + 1):31) {
+          oil <- rbind(oil, get_oil_row(last_year, last_month, d, last_oil_price))
+        }
+      }
+      
+      # Start of this month
+      if (cur_day - 1 >= 1) {
+        for (d in 1:(cur_day - 1)) {
+          oil <- rbind(oil, get_oil_row(cur_year, cur_month, d, last_oil_price))
+        }
+      }
+    }
+    
+    # For all skipped days in the same month
+    else if (cur_day - 1 >= last_day + 1) {
+      for (d in (last_day + 1):(cur_day - 1)) {
+        oil <- rbind(oil, get_oil_row(cur_year, cur_month, d, last_oil_price))
+      }
+    }
+    
+  }
+  
+  last_year <- cur_year
+  last_month <- cur_month
+  last_day <- cur_day
+  last_oil_price <- cur_oil_price
+}
+
+
 cols <- names(stores)[-1] # Except for store_nbr
 setnames(stores, (cols), paste("store_", (cols), sep=""))
-
-# Join with holidays_events
-#setkey(train, date)
-#setkey(holidays, date)
-#train <- merge(train, holidays, all.x = TRUE)
 
 # Join with items
 setkey(train, item_nbr)
@@ -174,6 +223,7 @@ test <- merge(test, oil, all.x = TRUE)
 setkey(test, store_nbr)
 setkey(stores, store_nbr)
 test <- merge(test, stores, all.x = TRUE)
+
 ```
 
 # 2. Sample training data
@@ -182,9 +232,9 @@ test <- merge(test, stores, all.x = TRUE)
 # RF dataset: sample from last 15 days
 set.seed(888)
 if (SMALLER_SAMPLE) {
-  p <- 100000/(125497040 - 123926072) # Proportion we want to sample (total, num. before Aug. 1 2016)
+  p <- 50000/(125497040 - 123926072) # Proportion we want to sample (total, num. before Aug. 1 2016)
 } else {
-  p <- 1 # Use all available data for last 15 days
+  p <- 200000/(125497040 - 123926072) # Proportion we want to sample (total, num. before Aug. 1 2016)
 }
 setkey(train, date)
 ndt <- train[, .(n = .N), by = date]
@@ -200,10 +250,13 @@ for (i in (num_days - 14):num_days) {
   start <- end + 1
 }
 sandbox_rf <- train[indices,]
-num_rf <- nrow(sandbox_rf)
 
 # ARIMA Reduced data set to work with (whole time period)
-p <- 1 # Use all training data for arima
+if (SMALLER_SAMPLE) {
+  p <- 0.05
+} else {
+  p <- 0.15 # Use a lot of training data for ARIMA
+}
 setkey(train, date)
 ndt <- train[, .(n = .N), by = date]
 indices <- c()
@@ -218,10 +271,20 @@ for (i in 1:num_days) {
   start <- end + 1
 }
 sandbox_arima <- train[indices,]
-num_arima <- nrow(sandbox_arima)
+
+# Class var: 0 - RF, 1 - ARIMA, 2 - TEST - to keep track of this split we made
+setDT(sandbox_rf)
+setDT(sandbox_arima)
+setDT(test)
+sandbox_rf[,class := 0]
+sandbox_arima[,class := 1]
+test[,class := 2]
 
 sandbox <- rbind(sandbox_rf, sandbox_arima)
 sandbox <- rbind(sandbox, test, fill=TRUE)
+
+num_rf <- nrow(sandbox_rf)
+num_arima <- nrow(sandbox_arima)
 
 ```
 
@@ -261,6 +324,7 @@ for (i in 1:length(store_cities)) {
   cur_store_city <- store_cities[i]
   sandbox[,(cur_store_city) := store_city == (cur_store_city)]
 }
+
 # Make a binary variable for each store cluster
 store_clusters <- unique(sandbox$store_cluster)
 for (i in 1:length(store_clusters)) {
@@ -276,7 +340,6 @@ for (i in 1:length(store_types)) {
 }
 
 # Adding months and days since Jan. 1 2013 (both starting at 1)
-setDT(sandbox)
 sandbox[,month_count := 12 * (year - 2013) + month]
 
 ```
@@ -293,10 +356,6 @@ setkey(train, id)
 t_pop <- train[id >= (cut), j = .(n = .N), by = .(store_nbr, item_nbr)]
 t_pop[,popular := n == 15]
 
-# Class var: 0 - RF, 1 - ARIMA, 2 - TEST
-setDT(sandbox)
-sandbox[,class := ifelse(.I <= (num_rf), 0, ifelse(.I <= (num_rf) + (num_arima), 1, 2))]
-
 # Split sandbox accordingly
 setDT(t_pop)
 setkey(sandbox, store_nbr, item_nbr)
@@ -306,6 +365,7 @@ s_all <- merge(sandbox, t_pop, all.x = TRUE)
 # For NA values, assume popular is false
 s_all[,popular := ifelse(is.na(popular),FALSE,popular)]
 
+# Splitting back up by class
 sandbox_rf2 <- s_all[class == 0]
 sandbox_rf2[,class:=NULL]
 arima2 <- s_all[class == 1]
@@ -323,6 +383,7 @@ test_not_popular <- test2[popular == FALSE]
 
 # 5. Train ARIMA Model
 ```{r}
+
 family_data <- data.frame()
 daily_sales <- arima_popular %>% group_by(date,item_family) %>% summarise(daily_class_sales = mean(unit_sales)) %>% filter(date > as.Date('2016-1-1')) #take the data from 2016 onwards 
 
@@ -380,11 +441,13 @@ test_popular[,popularity := ifelse(is.na(popularity),0,popularity)]
 ```{r}
 
 # Train/test data for popular items
+set.seed(888)
 s_p_indices <- sample(1:nrow(rf_popular), 0.7*nrow(rf_popular))
 s_p_train <- rf_popular[s_p_indices]
 s_p_test <- rf_popular[-s_p_indices]
 
 # Train/test data for unpopular items
+set.seed(888)
 s_np_indices <- sample(1:nrow(rf_not_popular), 0.7*nrow(rf_not_popular))
 s_np_train <- rf_not_popular[s_np_indices]
 s_np_test <- rf_not_popular[-s_np_indices]
@@ -396,8 +459,7 @@ s_p_cols <- c(s_p_cols, "popularity")
 # Model for popular items
 p_model_data <- s_p_train[,s_p_cols, with=FALSE]
 set.seed(888)
-pmdreduced <- p_model_data[7]
-p_model <- train(unit_sales ~ . , data=pmdreduced, method="rf",
+p_model <- train(unit_sales ~ . , data=p_model_data, method="rf",
                   trControl = trainControl(method="oob"),  # Use the OOB error rate 
                   ntree=500, tuneGrid = data.frame(mtry=((length(s_p_cols) - 1))/3),
                   importance = TRUE)  # need this for variable importance below
@@ -426,7 +488,6 @@ np_accuracy
 p_model_imp <- varImp(p_model)$importance
 np_model_imp <- varImp(np_model)$importance
 
-
 ```
 
 # 8. Predict test data
@@ -452,6 +513,7 @@ fwrite(final_predictions, "final_predictions.csv")
 # 3. Different variables' influence on sales
 # 4. Variable importance for two random forests
 # 5. Plotting errors in sample test
+# 6. Affect of popularity on unit sales
 
 # 1. Store popularity
 ```{r}
@@ -643,3 +705,12 @@ ggsave("plots/err_scaled_np.jpg")
 
 ```
 
+# 6. Affect of popularity on unit sales
+```{r}
+
+ggplot(data = s_p_test) + geom_smooth(aes(x = popularity, y = unit_sales)) +
+  expand_limits(y = 0) + 
+  xlab("Popularity") + ylab("Unit Sales") + ggtitle("Correlation of Popularity and Unit Sales")
+ggsave("plots/popularity_sales.jpg")
+
+```
