@@ -8,7 +8,7 @@ date: "December 14, 2017"
 
 # If TRUE, runs all of the main code. This will take a lot of time
 # If FALSE, will not run - this is best for quick knitting if all images area already loaded
-run_main_code <- FALSE
+run_main_code <- TRUE
 
 ```
 
@@ -36,11 +36,11 @@ We combined these different datasets with the training data. We joined these dat
 
 A diagram of the dual model pipeline is shown below:
 
-![Solution](pipeline.png)
+![The Pipeline](pipeline.png)
 
 We split our dataset into two groups: items that were purchased frequently and infrequently. For a given item, it is considered frequently purchased if for every store it is sold in, it was purchased every day the store was open. When training the model, only the last two weeks were considered (the two weeks leading up to the testing dataset). A graph of the distribution of item popularities is shown below. It shows that a significant proportion of items were sold every day.
 
-![Solution](plots/popularity_distribution.jpg)
+![Distribution of Item Popularities](plots/popularity_distribution.jpg)
 
 We divided our data this way because of an important nuance to the individual observations. Interestingly, our training and test data sets are composed of unit sales by item and store conditional on their purchase. We don’t have data on items that weren’t purchased and have no information on which items are in stock. Forecasting sales for items that don’t have data every day would be fitting a model to dangerously incomplete data. Consequently, in order to responsibly use the ARIMA model to pick up patterns over time, we must limit its scope to the frequently purchased items described above.
 
@@ -71,7 +71,7 @@ The Autoregressive Integrated Moving Average Model is ideal for short-term forec
 
 The “I” – Before we can talk about the relationship between a current value and its past instances, it is important to simplify the data. Time series patterns can often be separated into three general components.
 
-![Solution](Time_series.png)
+![Time Series Decomposition](Time_series.png)
 
 The diagram above begins with the data in its raw state. Although this depiction seems very chaotic, it is clear that there are general long-term trends inherent to the data. In order to account for these, the ARIMA model begins by "differencing" the data. This process is simply taking one observation and subtracting the observation behind it in order to remove persistent growth or decline patterns. It can be best understood intuitively with a simple example. Imagine that sales growth increased by one unit every day over the past work week from 1 unit to 5 units. If we differenced this time series, the new sales data would be a sequence of 1's (3-2 = 1, 4-3 = 1 etc.), effectively removing the increasing trend. However, let's say that along with this simplistic pattern, shoppers decide that Wednesday is the most important day to shop and unit sales spike for that day from 3 to 7. After differencing the data, (1,2,7,4,5 --> 1,1,5,-3,1), the upward trend is removed, but the general shape of spiking up to Wednesday and falling back down on Thursday is preserved. The same process and intuition is used to remove seasonality from the data by subtracting a value in the equivalent time period (the value last week, last month or last year depending on the seasonality being observed) from the current value. These differencing manipulations are performed and then stored in the model so that they can be undone when forecasting values. The "integrated" part in ARIMA (the “I”) simply means that this process has been completed. 
 
@@ -98,12 +98,12 @@ There are other interesting examples here: https://www.analyticsvidhya.com/blog/
 
 How does the ARMA model fit AR and MA terms?
 
-![Solution](AR_ACF.png)
-![Solution](MA_ACF.png)
+![Autoregressive ACF Plot](AR_ACF.png)
+![Moving Average ACF Plot](MA_ACF.png)
 
 Basically, the ARMA model is fitted by calculating the correlation of the current value with its “lags” aka its historical values. After generating these relationships, we can fit the descriptions detailed above to the plots of these correlations. 
 
-While the first plot looks like an autoregressive process because of the gradual decay, the one below it looks like the sudden decline that is indicative of a moving average process. As you can imagine, the more complicated the ACF plots, the more likely more AR and MA terms (and a combination of both) are needed to fit the pattern. It is also necessary to determine the amount of AR and MA terms by using partial correlation plots (in order to figure exactly which lags are uniquely correlated with the current value, but the math associated with this computation is outside the scope of this explanation). 
+While the first plot looks like an autoregressive process because of the gradual decay, the following one looks like the sudden decline that is indicative of a moving average process. As you can imagine, the more complicated the ACF plots, the more likely more AR and MA terms (and a combination of both) are needed to fit the pattern. It is also necessary to determine the amount of AR and MA terms by using partial correlation plots (in order to figure exactly which lags are uniquely correlated with the current value, but the math associated with this computation is outside the scope of this explanation). 
 
 See the full explanation of how to fit ARIMA models “by hand” here: https://www.datascience.com/blog/introduction-to-forecasting-with-arima-in-r-learn-data-science-tutorials
 
@@ -133,7 +133,7 @@ forecast <- forecast(grocery_ts_arima, h= 14)
 
 The results:
 
-![Solution](plots/arima_forecasts.jpg)
+![Arima Forecasts for all Item Families](plots/arima_forecasts.jpg)
 
 ## Random Forest Model Building
 
@@ -144,39 +144,39 @@ We used a sample of 34,000 observations from the 15 days of our dataset that cam
 We included the following variables in our random forest, as each had an impact on unit sales:
 
 
-![Solution](plots/1p.jpg)
-![Solution](plots/1np.jpg)
+![](plots/1p.jpg)
+![](plots/1np.jpg)
 
 
-![Solution](plots/8p.jpg)
-![Solution](plots/8np.jpg)
+![](plots/8p.jpg)
+![](plots/8np.jpg)
 
 
-![Solution](plots/2p.jpg)
-![Solution](plots/2np.jpg)
+![](plots/2p.jpg)
+![](plots/2np.jpg)
 
 
-![Solution](plots/3p.jpg)
-![Solution](plots/3np.jpg)
+![](plots/3p.jpg)
+![](plots/3np.jpg)
 
 
-![Solution](plots/4p.jpg)
-![Solution](plots/4np.jpg)
+![](plots/4p.jpg)
+![](plots/4np.jpg)
 
 
-![Solution](plots/5p.jpg)
-![Solution](plots/5np.jpg)
+![](plots/5p.jpg)
+![](plots/5np.jpg)
 
 
-![Solution](plots/6p.jpg)
-![Solution](plots/6np.jpg)
+![](plots/6p.jpg)
+![](plots/6np.jpg)
 
 
-![Solution](plots/7p.jpg)
-![Solution](plots/7np.jpg)
+![](plots/7p.jpg)
+![](plots/7np.jpg)
 
 
-![Solution](plots/popularity_sales.jpg)
+![](plots/popularity_sales.jpg)
 
 
 We split the categorical variables “item family,” “store city,” “store cluster,” “store type,” and “day of week” into many binary variables. The variable “item perishable” was already binary, and the variables “days since payday,” “oil price,” and “popularity” were continuous.
@@ -193,15 +193,15 @@ The “popularity" variable was created by applying the ARIMA model to each row 
 
 We trained our random forest and found that the following variables were important:
 
-![Solution](plots/varimp_p.jpg)
-![Solution](plots/varimp_np.jpg)
+![](plots/varimp_p.jpg)
+![](plots/varimp_np.jpg)
 
 “Popularity” was the most important variable, which means that our ARIMA model indeed contributed useful information. Variables corresponding to item family were also among the most important. This is not surprising because the charts above demonstrated that item family exhibited the strongest influence on expected unit sales out of all of the variables that we included in the random forest model.
 
 We held out 30% of our 30,000 observations as test data, and used these to analyze the accuracy of our model. The below plot shows the scaled error for each branch of the pipeline. Scaled error is absolute error proportional to unit sales. For example, if actual sales were 5, and we predicted 10 then the scaled error would be (10-5)/5 = 2.
 
-![Solution](plots/err_scaled_p.jpg)
-![Solution](plots/err_scaled_np.jpg)
+![](plots/err_scaled_p.jpg)
+![](plots/err_scaled_np.jpg)
 
 Overall our model did a mediocre job predicting sales. It often predicted incorrectly, often by a large factor.
 
