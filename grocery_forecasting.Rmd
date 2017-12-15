@@ -1,8 +1,16 @@
 ---
 title: "Forecasting Grocery Sales"
+author: "Victor de Fontnouvelle, Thomas Thornton, and Justin Weltz"
 output: pdf_document
-date: "December 12, 2017"
+date: "December 14, 2017"
 ---
+```{r}
+
+# If TRUE, runs all of the main code. This will take a lot of time
+# If FALSE, will not run - this is best for quick knitting if all images area already loaded
+run_main_code <- FALSE
+
+```
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -12,7 +20,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Forecasting sales is difficult, yet vitally important for grocery stores. Many items are perishable, and need to be sold soon after arrival. If the store orders too many supplies, they may have to discard a large portion of them. If they don’t order enough, they will miss out on potential sales when they run out of stock. An Ecuadorian-based grocery giant, Corporacion Favorita, relies on rudimentary forecasting techniques. They admit that they “currently rely on subjective forecasting methods with very little data to back them up and very little automation to execute plans.” Corporacion Favorita decided to implement data science methods in order to more accurately forecast sales. They posted a competition on Kaggle where they provided all sales data for all of their stores over a four-year period. 
 
-We built a model to analyze the training data, and predict the test data provided by Corporacio Favorito. Our model pipeline uses historical data to predict the unit sales of a given item. The first step was combining the different datasets provided by Corporacion Favorita. The data included roughly 200,000 products, several years of transactions for 54 distinct stores, and oil prices.
+We built a model to analyze the training data, and predict the test data provided by Corporacio Favorito. Our model pipeline uses historical data to predict the unit sales of a given item. The first step was combining the different datasets provided by Corporacion Favorita. The data included roughly 200,000 products, several years of daily transactions for 54 distinct stores, and oil prices.
 
 ## Project Report
 
@@ -30,13 +38,19 @@ A diagram of the dual model pipeline is shown below:
 
 ![Solution](pipeline.png)
 
-We split our dataset into two groups: items that were purchased frequently and infrequently. For a given item, it is considered frequently purchased if for every store it is sold in, it was purchased every day the store was open. For training the model, only the last two weeks were considered (the two weeks leading up to the testing dataset). A graph of the distribution of item popularities is shown below. It shows that a significant proportion of items were sold every day.
+We split our dataset into two groups: items that were purchased frequently and infrequently. For a given item, it is considered frequently purchased if for every store it is sold in, it was purchased every day the store was open. When training the model, only the last two weeks were considered (the two weeks leading up to the testing dataset). A graph of the distribution of item popularities is shown below. It shows that a significant proportion of items were sold every day.
 
 ![Solution](plots/popularity_distribution.jpg)
 
 We divided our data this way because of an important nuance to the individual observations. Interestingly, our training and test data sets are composed of unit sales by item and store conditional on their purchase. We don’t have data on items that weren’t purchased and have no information on which items are in stock. Forecasting sales for items that don’t have data every day would be fitting a model to dangerously incomplete data. Consequently, in order to responsibly use the ARIMA model to pick up patterns over time, we must limit its scope to the frequently purchased items described above.
 
 ##The ARIMA Model
+
+The process from a bird’s eye view:
+
+1.  The data is differenced in order to create a stationary time series.
+2.  The stationary time series is analyzed using AR and MA processes, which describe how the observations move back towards the mean of a stationary series after a shock.
+3.  The seasonality and trend of the data are added back in order to make forecasts.
 
 Why did we use this model?
 
@@ -63,7 +77,7 @@ The diagram above begins with the data in its raw state. Although this depiction
 
 Therefore, differencing removes the predictable time patterns from the data (trend and seasonality) in order to isolate the time-independent relationship between a current value and the observations that come before it. "Time-independence" here does not mean that we are no longer dealing with time series. Rather, it suggests that we are now able to observe patterns to the data that do not change with general time periods (trend) or calendar cycles (seasonality). This time series is now referred to as "stationary." There are a couple interesting properties of a stationary process, but the one that will be important moving forward is that values fluctuate around a mean because long term trends and seasonal patterns have been removed.
 
-"AR" and "MA" - However, now that we have isolated the time-independent stationary time series, how do we effectively model it? It seems like we have already removed the patterns that we typically think about when trying to describe time series data, so what else is there to analyze? This is a very legitimate question, and one I definitely considered when learning about the ARIMA model.  The answer is nuanced and very interesting. Again, I believe this is best explained using an example. Suppose that tomato sales in Quito are following a predictable weekly pattern. People typically tend to buy their tomatoes on Sunday, but they also buy them on Saturday after making a curtido de cebolla y tomate (looks delicious - https://www.laylita.com/recipes/curtido-de-cebolla-y-tomate-pickled-red-onion-and-tomato-salad/) for dinner Sunday night. Now, let’s say that one week tomatoes are especially sweet and ripe on Sunday and consumers decide to buy more than usual. How do the normal tomato buying patterns respond to this shock? Do consumers decide to buy more on Saturday because they have determined that tomatoes will be the staple of their dishes for this week? Do they buy less because they already have enough tomatoes to last for the near future? Is their consumption on Saturday unaffected? In this case, I fee like I can confidently forecast that tomato sales will drop below normal levels Saturday and eventually return to normal levels (although you can see how other items may be more ambiguous, e.g. wine and other luxury items). But, how far does it drop and how long does it take to return to normal? These are the questions that the ARMA (without the “I” because the time series has already been differenced) model attempts to answer.
+"AR" and "MA" - However, now that we have isolated the time-independent stationary time series, how do we effectively model it? It seems like we have already removed the patterns that we typically think about when trying to describe time series data, so what else is there to analyze? This is a very legitimate question, and one I definitely considered when learning about the ARIMA model.  The answer is nuanced and very interesting. Again, I believe this is best explained using an example. Suppose that tomato sales in Quito are following a predictable weekly pattern. People typically tend to buy their tomatoes on Sunday, but they also buy them on Saturday after making a curtido de cebolla y tomate (looks delicious - https://www.laylita.com/recipes/curtido-de-cebolla-y-tomate-pickled-red-onion-and-tomato-salad/) for dinner Sunday night. Now, let’s say that one week tomatoes are especially sweet and ripe on Sunday and consumers decide to buy more than usual. How do the normal tomato buying patterns respond to this shock? Do consumers decide to buy more on Saturday because they have determined that tomatoes will be the staple of their dishes for this week? Do they buy less because they already have enough tomatoes to last for the near future? Is their consumption on Saturday unaffected? In this case, I feel like I can confidently forecast that tomato sales will drop below normal levels Saturday and eventually return to normal levels (although you can see how other items may be more ambiguous, e.g. wine and other luxury items). But, how far does it drop and how long does it take to return to normal? These are the questions that the ARMA (without the “I” because the time series has already been differenced) model attempts to answer.
 
 ARMA does this with autoregressive and moving average regression terms.  These two concepts can be best understood as different ways of modeling the relationship between a current value and the values that come before it. Let’s use the examples I outlined above.
 
@@ -71,13 +85,13 @@ In basic mathematical terms, an autoregressive process is:
 
 $Y{_t} = b + aY{_{t-1}} + e{_t}$
 
-In other words, it is simply the current value predicted from the value before it, multiplied by a constant, plus an error term. It is important to remember that stationary time series values will fluctuate around a mean and therefore “a” cannot be greater than 1 (that way the value will eventually progress back to b). This process can be best understood with the hypothetical I propose above in which consumers decide to make tomatoes the staples of their meals for that week. In this case, the effect of an initial shock will persist for a while in smaller and smaller levels throughout the week until it becomes effectively zero.
+In other words, it is simply the current value predicted from the value before it, multiplied by a constant, plus an error term. It is important to remember that stationary time series values will fluctuate around a mean and therefore “a” cannot be greater than 1 (that way the value will eventually progress back to b). In the previous example, one possible outcome after increased tomato purchases on Sunday is that consumers decide to make tomatoes the staple of their meals for the week, and keep on purchasing more tomatoes than they normally would for a few days afterward. In this case, the effect of an initial shock will persist for a while in smaller and smaller levels throughout the week until it becomes effectively zero.
 
 In basic mathematical terms, a moving average process is:
 
 $Y{_t} = b + ce{_{t-1}} + e{_t}$
 
-In other words, it is simply the current value predicted from the error term before it, multiplied by a constant, plus an error term. While an autoregressive process describes a slow progression toward the mean of the series, the moving average term can model quick changes. This process can be best understood with the hypothetical I propose above in which there is a depression in tomato sales after the increase on Sunday because consumers believe they have enough of this product. In this case, the effect of a shock only lasts for the subsequent time period, after which tomato sales return to their normal levels.
+In other words, it is simply the current value predicted from the error term before it, multiplied by a constant, plus an error term. While an autoregressive process describes a slow progression toward the mean of the series, the moving average term can model quick changes. In the previous example, a different possible outcome is that consumers decide that they have enough tomatoes, and purchase less tomatoes than average for the next few days. In this case, the effect of a shock only lasts for the subsequent time period, after which tomato sales return to their normal levels.
 
 There are other interesting examples here: https://www.analyticsvidhya.com/blog/2015/12/complete-tutorial-time-series-modeling/
 
@@ -97,16 +111,10 @@ How does it all come together?
 
 At the end of the day, it was not incredibly important to understand the nitty-gritty of the ARMA fitting process because the auto.arima() function does it for us! This is very convenient and means we can focus on the intuition of the process and the results. 
 
-The process from a bird’s eye view:
+There are two important limitations:
 
-1.  The data is differenced in order to achieve a stationary time series.
-2.  The stationary time series is analyzed using AR and MA processes, which describe how the observations move back towards the mean of a stationary series after a shock.
-3.  The seasonality and trend of the data are added back in order to make forecasts.
-
-Two important limitations:
-
-1.  The ARIMA model can only model one type of seasonality at a time. We identified that weekly seasonality would be the most important dimension, but are definitely missing out on possible yearly seasonality (less ice cream cartons in the summer) because of the limitations of the model in R.
-2.  Lastly, although this is not necessarily a limitation, it is important to realize that the ARMA model is only useful in the very short term because it predicts a regression to the mean (or trend/seasonality once the time series has been un-differenced). After the effects of a shock peter out, the ARIMA model will continue to predict the trend/seasonality of the time series without any variation.
+1.  The ARIMA model can only model one type of seasonality at a time. We identified that weekly seasonality would be the most important dimension, but are definitely missing out on possible yearly seasonality (for example, more dairy product in the hot season) because of the limitations of the model in R.
+2.  The ARMA model is only useful in the very short term because it predicts a regression to the mean (or trend/seasonality once the time series has been un-differenced). After the effects of a shock peter out, the ARIMA model will continue to predict the trend/seasonality of the time series without any variation. This was not a problem for this kaggle competition, as the challenge was only to predict short-term sales.
 
 
 What did we use ARIMA for?
@@ -115,12 +123,11 @@ At the end of the day, we used the ARIMA model to predict the average unit sales
 
 Here is the code for how the ARIMA model is constructued.
 
-```{r, eval=FALSE, eval=FALSE}
+```{r, eval=FALSE}
 grocery_daily_sales <- daily_sales %>% filter(item_family == "GROCERY I") #filter by the class
 grocery_ts <- ts(grocery_daily_sales$daily_class_sales, frequency = 7) #create the time series with a week period
 grocery_ts <- tsclean(grocery_ts) #remove outliers
-grocery_ts_arima <- auto.arima(grocery_ts) #take out stepwise and 
-#approximation to make it go faster
+grocery_ts_arima <- auto.arima(grocery_ts)
 forecast <- forecast(grocery_ts_arima, h= 14)
 ```
 
@@ -130,9 +137,9 @@ The results:
 
 ## Random Forest Model Building
 
-For infrequently purchased items a random forest was used on the dataset. A random forest is an ensemble method that combines many regression decision trees. A regression decision tree creates splits a dataset on a variable at each branch. The regression value output of a sample is an average of every value in the leaf node of the tree. A random forest, averages all of the values of many regression trees together to create a final output value. The processing of averaging together the results of many trees helps reduce bias and variance. The decision tree for the infrequently purchased items is shown below:
+For infrequently purchased items a random forest was used on the dataset. A random forest is an ensemble method that combines many regression decision trees. A regression decision tree splits a dataset on a variable at each branch. A random forest, averages all of the values of many regression trees together to create a final output value. The processing of averaging together the results of many trees helps reduce bias and variance. The decision tree for the infrequently purchased items is shown below:
 
-We used a sample of 300,000 observations from the 15 days of our dataset that came directly before the 14 days in the test dataset. The 15 days correspond to 8/1/2016 through 8/15/2016. Our computational power was limited, so we decided that the most recent data would be the most relevant to predicting short-run test observations, as seasonal trends would not have a large effect over a short period of time. Additionally, there were no major holidays or unusual occurrences such as a recession or a natural disaster during the entire month of August 2016 in Ecuador, which further supports that sales trends in the first 15 days of the month are likely to be relatively similar to sales trends in the next 14 days of the month.
+We used a sample of 34,000 observations from the 15 days of our dataset that came directly before the 14 days in the test dataset. The 15 days correspond to 8/1/2016 through 8/15/2016. Our computational power was limited, so we decided that the most recent data would be the most relevant to predicting short-run test observations, as seasonal trends would not have a large effect over a short period of time. Additionally, there were no major holidays or unusual occurrences such as a recession or a natural disaster during the entire month of August 2016 in Ecuador, which further supports that sales trends in the first 15 days of the month are likely to be relatively similar to sales trends in the next 14 days of the month.
 
 We included the following variables in our random forest, as each had an impact on unit sales:
 
@@ -191,7 +198,7 @@ We trained our random forest and found that the following variables were importa
 
 “Popularity” was the most important variable, which means that our ARIMA model indeed contributed useful information. Variables corresponding to item family were also among the most important. This is not surprising because the charts above demonstrated that item family exhibited the strongest influence on expected unit sales out of all of the variables that we included in the random forest model.
 
-We held out 30% of our 300,000 observations as test data, and used these to analyze the accuracy of our model. The below plot shows the scaled error for each branch of the pipeline. Scaled error is absolute error proportional to unit sales. For example, if actual sales were 5, and we predicted 10 then the scaled error would be (10-5)/5 = 2.
+We held out 30% of our 30,000 observations as test data, and used these to analyze the accuracy of our model. The below plot shows the scaled error for each branch of the pipeline. Scaled error is absolute error proportional to unit sales. For example, if actual sales were 5, and we predicted 10 then the scaled error would be (10-5)/5 = 2.
 
 ![Solution](plots/err_scaled_p.jpg)
 ![Solution](plots/err_scaled_np.jpg)
@@ -216,7 +223,7 @@ Our models are only trained on Corporacion Favorita stores in Ecuador. This limi
 
 # IMPORTANT NOTES
 
-```{r, eval=FALSE}
+```{r, eval=run_main_code}
 
 # 1. Set to TRUE to import all relevant CSV files. Only need to do this once
 LOAD_CSV_DATA <- TRUE
@@ -260,7 +267,7 @@ C -- Data Visualization:
 # Section A -- Setup
 
 # 1. Install packages
-```{r, eval=FALSE}
+```{r, eval=run_main_code}
 
 if (DO_INSTALL_PACKAGES) {
   install.packages("data.table")
@@ -293,7 +300,7 @@ library('tidyr')
 ```
 
 # 2. Load data from CSV
-```{r, eval=FALSE}
+```{r, eval=run_main_code}
 
 if (LOAD_CSV_DATA) {
   train <- fread("train.csv")
@@ -319,7 +326,7 @@ if (LOAD_CSV_DATA) {
 # 8. Predict test data
 
 # 1. Joining tables
-```{r, eval=FALSE}
+```{r, eval=run_main_code}
 
 # Set names
 cols <- names(holidays)[-1] # Except for date
@@ -434,7 +441,7 @@ test <- merge(test, stores, all.x = TRUE)
 ```
 
 # 2. Sample training data
-```{r, eval=FALSE}
+```{r, eval=run_main_code}
 
 # RF dataset: sample from last 15 days
 set.seed(888)
@@ -496,7 +503,7 @@ num_arima <- nrow(sandbox_arima)
 ```
 
 # 3. Add variables
-```{r, eval=FALSE}
+```{r, eval=run_main_code}
 
 # Add cols for "year", "month", "weekday", "days_since_payday"
 
@@ -552,7 +559,7 @@ sandbox[,month_count := 12 * (year - 2013) + month]
 ```
 
 # 4 Splitting into separate rf, arima, and test tables
-```{r, eval=FALSE}
+```{r, eval=run_main_code}
 
 # Make data table for which items are sold every day
 tmp <- train[date == "2017-08-01"]
@@ -589,7 +596,7 @@ test_not_popular <- test2[popular == FALSE]
 ```
 
 # 5. Train ARIMA Model
-```{r, eval=FALSE}
+```{r, eval=run_main_code}
 
 family_data <- data.frame()
 daily_sales <- arima_popular %>% group_by(date,item_family) %>% summarise(daily_class_sales = mean(unit_sales)) %>% filter(date > as.Date('2016-1-1')) #take the data from 2016 onwards 
@@ -614,7 +621,7 @@ tidy_family_data$Day <- as.numeric(tidy_family_data$Day)
 ```
 
 # 6. Add ARIMA results to other rf and test tables
-```{r, eval=FALSE}
+```{r, eval=run_main_code}
 
 # Clean up to get cols "date", "item_family", "popularity"
 
@@ -645,7 +652,7 @@ test_popular[,popularity := ifelse(is.na(popularity),0,popularity)]
 ```
 
 # 7. Train random forests
-```{r, eval=FALSE}
+```{r, eval=run_main_code}
 
 # Train/test data for popular items
 set.seed(888)
@@ -698,7 +705,7 @@ np_model_imp <- varImp(np_model)$importance
 ```
 
 # 8. Predict test data
-```{r, eval=FALSE}
+```{r, eval=run_main_code}
 
 # Predict test_popular and test_not_popular
 test_p_predictions <- predict(p_model, newdata = test_popular)
@@ -723,7 +730,7 @@ fwrite(final_predictions, "final_predictions.csv")
 # 6. Affect of popularity on unit sales
 
 # 1. Store popularity
-```{r, eval=FALSE}
+```{r, eval=run_main_code}
 
 ggplot(data = t_pop) + geom_histogram(aes(x = n, y =..density..)) + xlab("Number of Days Sold 8/1/16 to 8/15/16") + ggtitle("Distribution of Item Popularities")
 ggsave("plots/popularity_distribution.jpg")
@@ -731,7 +738,7 @@ ggsave("plots/popularity_distribution.jpg")
 ```
 
 # 2. Arima model
-```{r, eval=FALSE}
+```{r, eval=run_main_code}
 
 ggplot() + geom_line(data = tidy_family_data, aes(x= Day, y= Sales, color = Family)) #plot
 ggsave("plots/arima_forecasts.jpg")
@@ -739,7 +746,7 @@ ggsave("plots/arima_forecasts.jpg")
 ```
 
 # 3. Different variables' influence on sales
-```{r, eval=FALSE}
+```{r, eval=run_main_code}
 
 # How item_family affects sales
 item_family_sales <- rf_popular[,j = .(mean_sales = mean(unit_sales)), by = item_family]
@@ -863,7 +870,7 @@ ggsave("plots/8np.jpg")
 ```
 
 # 4. Variable importance for two random forests
-```{r, eval=FALSE, fig.width=3,fig.height=7}
+```{r, eval=run_main_code, fig.width=3,fig.height=7}
 
 ggplot(varImp(p_model, n = 10))
 ggsave("plots/varimp_p.jpg")
@@ -873,7 +880,7 @@ ggsave("plots/varimp_np.jpg")
 ```
 
 # 5. Plotting errors in sample test
-```{r, eval=FALSE}
+```{r, eval=run_main_code}
 
 p_err <- p_predictions - p_actual
 p_err_prop <- p_err/p_actual
@@ -913,7 +920,7 @@ ggsave("plots/err_scaled_np.jpg")
 ```
 
 # 6. Affect of popularity on unit sales
-```{r, eval=FALSE}
+```{r, eval=run_main_code}
 
 ggplot(data = s_p_test) + geom_smooth(aes(x = popularity, y = unit_sales)) +
   expand_limits(y = 0) + 

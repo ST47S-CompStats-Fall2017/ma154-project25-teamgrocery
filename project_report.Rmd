@@ -488,11 +488,11 @@ An example?
 
 ```{r}
 grocery_daily_sales <- daily_sales %>% filter(item_family == "GROCERY I") #filter by the class
-  grocery_ts <- ts(grocery_daily_sales$daily_class_sales, frequency = 7) #create the time series with a week period
-  grocery_ts <- tsclean(grocery_ts) #remove outliers
-  grocery_ts_arima <- auto.arima(grocery_ts) #take out stepwise and 
-  #approximation to make it go faster
-  forecast <- forecast(grocery_ts_arima, h= 14)
+grocery_ts <- ts(grocery_daily_sales$daily_class_sales, frequency = 7) #create the time series with a week period
+grocery_ts <- tsclean(grocery_ts) #remove outliers
+grocery_ts_arima <- auto.arima(grocery_ts) #take out stepwise and 
+#approximation to make it go faster
+forecast <- forecast(grocery_ts_arima, h= 14)
 ```
 
 
